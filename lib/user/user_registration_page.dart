@@ -251,7 +251,7 @@ class _UserRegistrationPageState extends State<UserRegistrationPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Account'),
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -267,7 +267,7 @@ class _UserRegistrationPageState extends State<UserRegistrationPage> {
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade700,
+                        color: Colors.indigo.shade700,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -303,7 +303,7 @@ class _UserRegistrationPageState extends State<UserRegistrationPage> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade900,
+                  color: Colors.indigo.shade900,
                 ),
               ),
 
@@ -484,7 +484,7 @@ class _UserRegistrationPageState extends State<UserRegistrationPage> {
                             TextSpan(
                               text: 'Terms and Conditions',
                               style: TextStyle(
-                                color: Colors.blue.shade700,
+                                color: Colors.indigo.shade700,
                                 decoration: TextDecoration.underline,
                               ),
                               recognizer: TapGestureRecognizer()
@@ -494,7 +494,7 @@ class _UserRegistrationPageState extends State<UserRegistrationPage> {
                             TextSpan(
                               text: 'Privacy Policy',
                               style: TextStyle(
-                                color: Colors.blue.shade700,
+                                color: Colors.indigo.shade700,
                                 decoration: TextDecoration.underline,
                               ),
                               recognizer: TapGestureRecognizer()
@@ -516,7 +516,7 @@ class _UserRegistrationPageState extends State<UserRegistrationPage> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _proceedToNextPage,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
+                    backgroundColor: Colors.indigo.shade700,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

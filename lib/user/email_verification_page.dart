@@ -211,7 +211,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Verify Email'),
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
       ),
@@ -228,7 +228,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade700,
+                        color: Colors.indigo.shade700,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -238,7 +238,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade700,
+                        color: Colors.indigo.shade700,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -262,7 +262,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
               Icon(
                 Icons.email_outlined,
                 size: 80,
-                color: Colors.blue.shade700,
+                color: Colors.indigo.shade700,
               ),
 
               const SizedBox(height: 30),
@@ -272,7 +272,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade900,
+                  color: Colors.indigo.shade900,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -295,7 +295,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.blue.shade700,
+                  color: Colors.indigo.shade700,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -305,17 +305,17 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: Colors.indigo.shade50,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.blue.shade200,
+                    color: Colors.indigo.shade200,
                   ),
                 ),
                 child: Column(
                   children: [
                     Icon(
                       Icons.info_outline,
-                      color: Colors.blue.shade700,
+                      color: Colors.indigo.shade700,
                       size: 32,
                     ),
                     const SizedBox(height: 12),
@@ -349,7 +349,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                 child: Text(
                   _canResend ? 'Resend Verification Email' : 'Resend in $_resendCountdown seconds',
                   style: TextStyle(
-                    color: _canResend ? Colors.blue.shade700 : Colors.grey,
+                    color: _canResend ? Colors.indigo.shade700 : Colors.grey,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -363,7 +363,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _verifyAndSignUp,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
+                    backgroundColor: Colors.indigo.shade700,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -428,7 +428,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                 child: Text(
                   'Back to Login',
                   style: TextStyle(
-                    color: Colors.blue.shade700,
+                    color: Colors.indigo.shade700,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

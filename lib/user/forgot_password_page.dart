@@ -70,7 +70,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Forgot Password'),
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -86,7 +86,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 Icon(
                   Icons.lock_reset,
                   size: 80,
-                  color: Colors.blue.shade700,
+                  color: Colors.indigo.shade700,
                 ),
 
                 const SizedBox(height: 30),
@@ -96,7 +96,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade900,
+                    color: Colors.indigo.shade900,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -144,7 +144,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _sendVerificationLink,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
+                      backgroundColor: Colors.indigo.shade700,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -186,7 +186,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       child: Text(
                         'Login',
                         style: TextStyle(
-                          color: Colors.blue.shade700,
+                          color: Colors.indigo.shade700,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

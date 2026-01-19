@@ -20,10 +20,10 @@ class CampusLostAndFoundApp extends StatelessWidget {
       title: 'Campus Lost & Found',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.indigo,
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
+          seedColor: Colors.indigo,
           brightness: Brightness.light,
         ),
       ),

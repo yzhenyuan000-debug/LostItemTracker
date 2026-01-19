@@ -52,7 +52,7 @@ class _UserHomePageState extends State<UserHomePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Campus Lost & Found'),
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         actions: [
@@ -101,8 +101,8 @@ class _UserHomePageState extends State<UserHomePage> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.blue.shade700,
-                        Colors.blue.shade500,
+                        Colors.indigo.shade700,
+                        Colors.indigo.shade500,
                       ],
                     ),
                     borderRadius: BorderRadius.circular(16),
@@ -197,7 +197,7 @@ class _UserHomePageState extends State<UserHomePage> {
                       child: _buildActionCard(
                         icon: Icons.inventory_2_outlined,
                         title: 'Found Items',
-                        color: Colors.blue.shade400,
+                        color: Colors.indigo.shade400,
                         onTap: () {
                           // TODO: Navigate to found items page
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -289,7 +289,7 @@ class _UserHomePageState extends State<UserHomePage> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.blue.shade700,
+        selectedItemColor: Colors.indigo.shade700,
         unselectedItemColor: Colors.grey.shade500,
         currentIndex: 0,
         onTap: (index) {

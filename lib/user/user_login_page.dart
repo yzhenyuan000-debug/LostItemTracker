@@ -151,7 +151,7 @@ class _UserLoginPageState extends State<UserLoginPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Login'),
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -167,7 +167,7 @@ class _UserLoginPageState extends State<UserLoginPage> {
                 Icon(
                   Icons.person,
                   size: 80,
-                  color: Colors.blue.shade700,
+                  color: Colors.indigo.shade700,
                 ),
 
                 const SizedBox(height: 20),
@@ -177,7 +177,7 @@ class _UserLoginPageState extends State<UserLoginPage> {
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade900,
+                    color: Colors.indigo.shade900,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -258,7 +258,7 @@ class _UserLoginPageState extends State<UserLoginPage> {
                     },
                     child: Text(
                       'Forgot Password?',
-                      style: TextStyle(color: Colors.blue.shade700),
+                      style: TextStyle(color: Colors.indigo.shade700),
                     ),
                   ),
                 ),
@@ -270,7 +270,7 @@ class _UserLoginPageState extends State<UserLoginPage> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
+                      backgroundColor: Colors.indigo.shade700,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -316,7 +316,7 @@ class _UserLoginPageState extends State<UserLoginPage> {
                       child: Text(
                         'Sign Up',
                         style: TextStyle(
-                          color: Colors.blue.shade700,
+                          color: Colors.indigo.shade700,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

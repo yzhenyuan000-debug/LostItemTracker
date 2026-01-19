@@ -15,7 +15,7 @@ class RoleSelectionPage extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.blue.shade50,
+              Colors.indigo.shade50,
               Colors.white,
             ],
           ),
@@ -37,7 +37,7 @@ class RoleSelectionPage extends StatelessWidget {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blue.withOpacity(0.15),
+                            color: Colors.indigo.withOpacity(0.15),
                             blurRadius: 30,
                             spreadRadius: 5,
                             offset: Offset(0, 0),
@@ -57,7 +57,7 @@ class RoleSelectionPage extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade900,
+                        color: Colors.indigo.shade900,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -105,7 +105,7 @@ class RoleSelectionPage extends StatelessWidget {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
+                          backgroundColor: Colors.indigo.shade700,
                           foregroundColor: Colors.white,
                           elevation: 2,
                           shape: RoundedRectangleBorder(
@@ -145,9 +145,9 @@ class RoleSelectionPage extends StatelessWidget {
                           );
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.blue.shade700,
+                          foregroundColor: Colors.indigo.shade700,
                           side: BorderSide(
-                            color: Colors.blue.shade700,
+                            color: Colors.indigo.shade700,
                             width: 2,
                           ),
                           shape: RoundedRectangleBorder(

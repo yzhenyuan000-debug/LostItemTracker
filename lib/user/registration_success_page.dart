@@ -158,10 +158,10 @@ class _RegistrationSuccessPageState extends State<RegistrationSuccessPage> with 
                     vertical: 16,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: Colors.indigo.shade50,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Colors.blue.shade200,
+                      color: Colors.indigo.shade200,
                     ),
                   ),
                   child: Row(
@@ -169,7 +169,7 @@ class _RegistrationSuccessPageState extends State<RegistrationSuccessPage> with 
                     children: [
                       Icon(
                         Icons.access_time,
-                        color: Colors.blue.shade700,
+                        color: Colors.indigo.shade700,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -177,7 +177,7 @@ class _RegistrationSuccessPageState extends State<RegistrationSuccessPage> with 
                         'Redirecting in $_countdown seconds',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.blue.shade700,
+                          color: Colors.indigo.shade700,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -197,7 +197,7 @@ class _RegistrationSuccessPageState extends State<RegistrationSuccessPage> with 
                       _navigateToLogin();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
+                      backgroundColor: Colors.indigo.shade700,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
