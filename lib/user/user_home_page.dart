@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_login_page.dart';
+import 'report_type_selection_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -222,17 +223,10 @@ class _UserHomePageState extends State<UserHomePage> {
                         title: 'Report Item',
                         color: Colors.red.shade400,
                         onTap: () {
-                          // TODO: Navigate to report item page
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Report Item feature coming soon'),
-                              behavior: SnackBarBehavior.floating,
-                              margin: const EdgeInsets.only(
-                                left: 16,
-                                right: 16,
-                                bottom: 1,
-                              ),
-                              duration: const Duration(seconds: 2),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ReportTypeSelectionPage(),
                             ),
                           );
                         },
@@ -379,17 +373,10 @@ class _UserHomePageState extends State<UserHomePage> {
       bottomNavigationBar: _buildCustomBottomNav(),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Navigate to report page
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Report feature coming soon'),
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.only(
-                left: 16,
-                right: 16,
-                bottom: 1,
-              ),
-              duration: const Duration(seconds: 2),
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ReportTypeSelectionPage(),
             ),
           );
         },
