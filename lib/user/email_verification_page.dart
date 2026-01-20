@@ -9,7 +9,7 @@ class EmailVerificationPage extends StatefulWidget {
   final String email;
   final String fullName;
   final String phoneNumber;
-  final String studentId;
+  final String campusId;
   final String userId;
 
   const EmailVerificationPage({
@@ -17,7 +17,7 @@ class EmailVerificationPage extends StatefulWidget {
     required this.email,
     required this.fullName,
     required this.phoneNumber,
-    required this.studentId,
+    required this.campusId,
     required this.userId,
   });
 

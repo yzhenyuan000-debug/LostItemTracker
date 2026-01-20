@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_login_page.dart';
 
 class UserHomePage extends StatefulWidget {
@@ -11,6 +12,35 @@ class UserHomePage extends StatefulWidget {
 
 class _UserHomePageState extends State<UserHomePage> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
+  String? fullName;
+  String? campusId;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    if (currentUser != null) {
+      try {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser!.uid)
+            .get();
+
+        if (userDoc.exists) {
+          setState(() {
+            fullName = userDoc.get('fullName') ?? 'User';
+            campusId = userDoc.get('campusId') ?? 'N/A';
+          });
+        }
+      } catch (e) {
+        print('Error loading user data: $e');
+      }
+    }
+  }
 
   Future<void> _handleLogout() async {
     showDialog(
@@ -51,22 +81,38 @@ class _UserHomePageState extends State<UserHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Campus Lost & Found'),
+        title: Row(
+          children: [
+            // Logo placeholder - replace with actual logo asset
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: Image.asset(
+                  'assets/logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            const SizedBox(width: 15),
+            const Expanded(
+              child: Text(
+                'TARUMT Lost Item Tracker',
+                style: TextStyle(fontSize: 20),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: Implement notifications
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Notifications feature coming soon'),
-                ),
-              );
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _handleLogout,
@@ -76,13 +122,19 @@ class _UserHomePageState extends State<UserHomePage> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          // TODO: Implement refresh logic
+          await _loadUserData();
           await Future.delayed(const Duration(seconds: 1));
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Refreshed'),
-                duration: Duration(seconds: 1),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 1,
+                ),
+                duration: const Duration(seconds: 2),
               ),
             );
           }
@@ -113,12 +165,21 @@ class _UserHomePageState extends State<UserHomePage> {
                       const Text(
                         'Welcome Back!',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 8),
+                      Text(
+                        fullName ?? 'Loading...',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       Text(
                         currentUser?.email ?? 'User',
                         style: const TextStyle(
@@ -128,7 +189,7 @@ class _UserHomePageState extends State<UserHomePage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'User ID: ${currentUser?.uid.substring(0, 8) ?? 'N/A'}...',
+                        'ID: ${campusId ?? 'Loading...'}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Colors.white60,
@@ -158,13 +219,20 @@ class _UserHomePageState extends State<UserHomePage> {
                     Expanded(
                       child: _buildActionCard(
                         icon: Icons.add_circle_outline,
-                        title: 'Report Lost Item',
+                        title: 'Report Item',
                         color: Colors.red.shade400,
                         onTap: () {
-                          // TODO: Navigate to report lost item page
+                          // TODO: Navigate to report item page
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Report Lost Item feature coming soon'),
+                              content: Text('Report Item feature coming soon'),
+                              behavior: SnackBarBehavior.floating,
+                              margin: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                bottom: 1,
+                              ),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         },
@@ -181,6 +249,13 @@ class _UserHomePageState extends State<UserHomePage> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Find Item feature coming soon'),
+                              behavior: SnackBarBehavior.floating,
+                              margin: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                bottom: 1,
+                              ),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         },
@@ -195,14 +270,21 @@ class _UserHomePageState extends State<UserHomePage> {
                   children: [
                     Expanded(
                       child: _buildActionCard(
-                        icon: Icons.inventory_2_outlined,
-                        title: 'Found Items',
-                        color: Colors.indigo.shade400,
+                        icon: Icons.map_outlined,
+                        title: 'Campus Map',
+                        color: Colors.blue.shade400,
                         onTap: () {
-                          // TODO: Navigate to found items page
+                          // TODO: Navigate to campus map page
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Found Items feature coming soon'),
+                              content: Text('Campus Map feature coming soon'),
+                              behavior: SnackBarBehavior.floating,
+                              margin: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                bottom: 1,
+                              ),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         },
@@ -219,6 +301,13 @@ class _UserHomePageState extends State<UserHomePage> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('My Reports feature coming soon'),
+                              behavior: SnackBarBehavior.floating,
+                              margin: const EdgeInsets.only(
+                                left: 16,
+                                right: 16,
+                                bottom: 1,
+                              ),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         },
@@ -229,9 +318,9 @@ class _UserHomePageState extends State<UserHomePage> {
 
                 const SizedBox(height: 30),
 
-                // Recent Activity
+                // Latest Lost or Found Item Feed
                 Text(
-                  'Recent Activity',
+                  'Latest Lost or Found Item Feed',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -241,7 +330,7 @@ class _UserHomePageState extends State<UserHomePage> {
 
                 const SizedBox(height: 16),
 
-                // Placeholder for recent activity
+                // Placeholder for latest items feed
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(40),
@@ -255,13 +344,13 @@ class _UserHomePageState extends State<UserHomePage> {
                   child: Column(
                     children: [
                       Icon(
-                        Icons.inbox_outlined,
+                        Icons.feed_outlined,
                         size: 64,
                         color: Colors.grey.shade400,
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No Recent Activity',
+                        'No Items Yet',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -270,7 +359,7 @@ class _UserHomePageState extends State<UserHomePage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Your recent lost and found activities will appear here',
+                        'Latest lost and found items will appear here',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade500,
@@ -287,38 +376,88 @@ class _UserHomePageState extends State<UserHomePage> {
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.indigo.shade700,
-        unselectedItemColor: Colors.grey.shade500,
-        currentIndex: 0,
-        onTap: (index) {
-          // TODO: Implement navigation
-          if (index != 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Navigation to ${_getNavLabel(index)} coming soon'),
-                duration: const Duration(seconds: 1),
+      bottomNavigationBar: _buildCustomBottomNav(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // TODO: Navigate to report page
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Report feature coming soon'),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.only(
+                left: 16,
+                right: 16,
+                bottom: 1,
               ),
-            );
-          }
+              duration: const Duration(seconds: 2),
+            ),
+          );
         },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+        backgroundColor: Colors.indigo.shade700,
+        child: const Icon(Icons.add, color: Colors.white, size: 32),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+    );
+  }
+
+  Widget _buildCustomBottomNav() {
+    return BottomAppBar(
+      shape: const CircularNotchedRectangle(),
+      notchMargin: 8.0,
+      child: SizedBox(
+        height: 40,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(Icons.home, 'Home', 0),
+            _buildNavItem(Icons.search, 'Search', 1),
+            const SizedBox(width: 40), // Space for FAB
+            _buildNavItem(Icons.notifications_outlined, 'Notification', 3),
+            _buildNavItem(Icons.person, 'Account', 4),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    final isSelected = _currentIndex == index;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _currentIndex = index;
+        });
+        if (index != 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Navigation to $label coming soon'),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.only(
+                left: 16,
+                right: 16,
+                bottom: 1,
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade500,
+            size: 24,
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline),
-            label: 'Report',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade500,
+            ),
           ),
         ],
       ),
@@ -364,20 +503,5 @@ class _UserHomePageState extends State<UserHomePage> {
         ),
       ),
     );
-  }
-
-  String _getNavLabel(int index) {
-    switch (index) {
-      case 0:
-        return 'Home';
-      case 1:
-        return 'Search';
-      case 2:
-        return 'Report';
-      case 3:
-        return 'Profile';
-      default:
-        return '';
-    }
   }
 }
