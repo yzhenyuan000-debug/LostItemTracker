@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_login_page.dart';
 import 'report_type_selection_page.dart';
+import 'campus_map_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -268,17 +269,10 @@ class _UserHomePageState extends State<UserHomePage> {
                         title: 'Campus Map',
                         color: Colors.blue.shade400,
                         onTap: () {
-                          // TODO: Navigate to campus map page
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Campus Map feature coming soon'),
-                              behavior: SnackBarBehavior.floating,
-                              margin: const EdgeInsets.only(
-                                left: 16,
-                                right: 16,
-                                bottom: 1,
-                              ),
-                              duration: const Duration(seconds: 2),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CampusMapPage(),
                             ),
                           );
                         },
