@@ -15,14 +15,10 @@ class CampusMapPage extends StatefulWidget {
 class _CampusMapPageState extends State<CampusMapPage> {
   final MapController _mapController = MapController();
 
-  // Campus center
   static const LatLng _campusCenter = LatLng(3.2158, 101.7306);
-
-  // Drop-off Desk locations
   static const LatLng _libraryDeskLocation = LatLng(3.2172500, 101.7276667);
   static const LatLng _citcDeskLocation = LatLng(3.2139167, 101.7265000);
 
-  // Campus boundary
   final List<LatLng> _campusBoundary = const [
     LatLng(3.2149188, 101.7284679),
     LatLng(3.2150248, 101.7286868),
@@ -73,7 +69,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
     LatLng(3.2149188, 101.7284679),
   ];
 
-  // Route planning variables
   LatLng? _startPoint;
   LatLng? _endPoint;
   List<LatLng> _routePoints = [];
@@ -82,16 +77,14 @@ class _CampusMapPageState extends State<CampusMapPage> {
   bool _isSelectingEnd = false;
   bool _isCalculatingRoute = false;
 
-  // User location
   LatLng? _userLocation;
-
   String? _selectedMarker;
+  String? _selectedDesk;
 
   void _recenterMap() {
     _mapController.move(_campusCenter, 16.5);
   }
 
-  // Handle map tap for selecting start/end points
   void _onMapTap(LatLng point) {
     setState(() {
       if (_isSelectingStart) {
@@ -108,7 +101,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
     });
   }
 
-  // Get user's current location
   Future<void> _getUserLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -167,7 +159,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
     }
   }
 
-  // Calculate route using OSRM API
   Future<void> _calculateRoute() async {
     if (_startPoint == null || _endPoint == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -227,13 +218,45 @@ class _CampusMapPageState extends State<CampusMapPage> {
     }
   }
 
-  // Format distance in meters or kilometers
   String _formatDistance(double meters) {
     if (meters < 1000) {
       return '${meters.toStringAsFixed(0)} m';
     } else {
       return '${(meters / 1000).toStringAsFixed(2)} km';
     }
+  }
+
+  String _calculateWalkingTime(double meters) {
+    const double walkingSpeedKmh = 5.0;
+    double kilometers = meters / 1000;
+    double hours = kilometers / walkingSpeedKmh;
+    int minutes = (hours * 60).round();
+    return '$minutes min';
+  }
+
+  void _onDeskSelected(String? desk) {
+    if (desk == null) return;
+
+    setState(() {
+      _selectedDesk = desk;
+    });
+
+    LatLng targetLocation;
+    String markerType;
+
+    if (desk == 'Library Desk') {
+      targetLocation = _libraryDeskLocation;
+      markerType = 'library';
+    } else {
+      targetLocation = _citcDeskLocation;
+      markerType = 'citc';
+    }
+
+    _mapController.move(targetLocation, 18.0);
+
+    setState(() {
+      _selectedMarker = markerType;
+    });
   }
 
   @override
@@ -245,7 +268,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.my_location),
+            icon: const Icon(Icons.center_focus_strong),
             onPressed: _recenterMap,
             tooltip: 'Recenter Map',
           ),
@@ -253,13 +276,12 @@ class _CampusMapPageState extends State<CampusMapPage> {
       ),
       body: Stack(
         children: [
-          // Map
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _campusCenter,
               initialZoom: 16.5,
-              minZoom: 15.5,
+              minZoom: 14.0,
               maxZoom: 19.0,
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.all,
@@ -291,7 +313,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
                   ),
                 ],
               ),
-              // Route polyline
               if (_routePoints.isNotEmpty)
                 PolylineLayer(
                   polylines: [
@@ -302,10 +323,8 @@ class _CampusMapPageState extends State<CampusMapPage> {
                     ),
                   ],
                 ),
-              // Markers
               MarkerLayer(
                 markers: [
-                  // Library Desk
                   Marker(
                     point: _libraryDeskLocation,
                     width: 40,
@@ -323,7 +342,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
                       ),
                     ),
                   ),
-                  // CITC Desk
                   Marker(
                     point: _citcDeskLocation,
                     width: 40,
@@ -341,7 +359,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
                       ),
                     ),
                   ),
-                  // Start point marker
                   if (_startPoint != null)
                     Marker(
                       point: _startPoint!,
@@ -353,7 +370,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
                         color: Colors.green.shade600,
                       ),
                     ),
-                  // End point marker
                   if (_endPoint != null)
                     Marker(
                       point: _endPoint!,
@@ -370,7 +386,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ],
           ),
 
-          // Control panel
           Positioned(
             bottom: 16,
             left: 16,
@@ -476,18 +491,38 @@ class _CampusMapPageState extends State<CampusMapPage> {
                           color: Colors.indigo.shade50,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        child: Column(
                           children: [
-                            Icon(Icons.straighten, size: 18, color: Colors.indigo.shade700),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Distance: ${_formatDistance(_routeDistance!)}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.indigo.shade700,
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.straighten, size: 18, color: Colors.indigo.shade700),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Distance: ${_formatDistance(_routeDistance!)}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.indigo.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.access_time, size: 18, color: Colors.indigo.shade700),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Walking Time: ${_calculateWalkingTime(_routeDistance!)}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.indigo.shade700,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -499,14 +534,13 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
 
-          // Legend
           Positioned(
             left: 16,
             top: 16,
             child: Card(
               elevation: 4,
               child: Padding(
-                padding: const EdgeInsets.all(12.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,22 +553,34 @@ class _CampusMapPageState extends State<CampusMapPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.location_on, size: 18, color: Colors.blue.shade700),
-                        const SizedBox(width: 6),
-                        const Text('Library Desk', style: TextStyle(fontSize: 12)),
+                    DropdownButton<String>(
+                      value: _selectedDesk,
+                      hint: const Text('Select Desk', style: TextStyle(fontSize: 13)),
+                      isExpanded: false,
+                      underline: Container(),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Library Desk',
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on, size: 16, color: Colors.blue),
+                              SizedBox(width: 8),
+                              Text('Library Desk', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'CITC Desk',
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on, size: 16, color: Colors.orange),
+                              SizedBox(width: 8),
+                              Text('CITC Desk', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
                       ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.location_on, size: 18, color: Colors.orange.shade700),
-                        const SizedBox(width: 6),
-                        const Text('CITC Desk', style: TextStyle(fontSize: 12)),
-                      ],
+                      onChanged: _onDeskSelected,
                     ),
                   ],
                 ),
@@ -542,7 +588,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
 
-          // Marker info window
           if (_selectedMarker != null)
             Positioned(
               top: 16,
@@ -550,7 +595,18 @@ class _CampusMapPageState extends State<CampusMapPage> {
               child: _buildInfoWindow(),
             ),
 
-          // Zoom buttons
+          Positioned(
+            left: 16,
+            top: MediaQuery.of(context).size.height / 2 - 18,
+            child: FloatingActionButton(
+              heroTag: 'get_location',
+              onPressed: _getUserLocation,
+              backgroundColor: Colors.indigo.shade700,
+              child: const Icon(Icons.my_location, color: Colors.white),
+              tooltip: 'Get Current Location',
+            ),
+          ),
+
           Positioned(
             right: 16,
             top: MediaQuery.of(context).size.height / 2 - 50,
@@ -588,12 +644,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _getUserLocation,
-        backgroundColor: Colors.indigo.shade700,
-        child: const Icon(Icons.my_location, color: Colors.white),
-        tooltip: 'Get Current Location',
       ),
     );
   }
