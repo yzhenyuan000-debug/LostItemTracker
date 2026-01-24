@@ -5,6 +5,25 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 
+// Location data model
+class LocationInfo {
+  final String name;
+  final String description;
+  final String operatingHours;
+  final String contact;
+  final Color color;
+  final LatLng position;
+
+  LocationInfo({
+    required this.name,
+    required this.description,
+    required this.operatingHours,
+    required this.contact,
+    required this.color,
+    required this.position,
+  });
+}
+
 class CampusMapPage extends StatefulWidget {
   const CampusMapPage({super.key});
 
@@ -21,12 +40,15 @@ class _CampusMapPageState extends State<CampusMapPage> {
   static const LatLng _libraryDeskLocation = LatLng(3.2172500, 101.7276667);
   static const LatLng _citcDeskLocation = LatLng(3.2139167, 101.7265000);
 
-  // Campus Blocks (DMS converted to decimal degrees)
+  // Campus Blocks
   static const LatLng _blockALocation = LatLng(3.21525, 101.72664);
   static const LatLng _blockDLocation = LatLng(3.21667, 101.72667);
   static const LatLng _blockQLocation = LatLng(3.21800, 101.72698);
   static const LatLng _sportComplexLocation = LatLng(3.21814, 101.72970);
   static const LatLng _blockSBLocation = LatLng(3.21642, 101.73339);
+
+  // Location information database
+  late Map<String, LocationInfo> _locationDatabase;
 
   final List<LatLng> _campusBoundary = const [
     LatLng(3.2149188, 101.7284679),
@@ -89,6 +111,73 @@ class _CampusMapPageState extends State<CampusMapPage> {
   LatLng? _userLocation;
   String? _selectedMarker;
   String? _selectedLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeLocationDatabase();
+  }
+
+  void _initializeLocationDatabase() {
+    _locationDatabase = {
+      'library': LocationInfo(
+        name: 'Library Drop-off Desk',
+        description: 'Lost & Found Collection Point',
+        operatingHours: 'Mon-Fri: 8:00 AM - 6:00 PM\nSat: 8:00 AM - 2:00 PM',
+        contact: 'Tel: +603-4145-0123\nEmail: library@tarc.edu.my',
+        color: Colors.blue.shade700,
+        position: _libraryDeskLocation,
+      ),
+      'citc': LocationInfo(
+        name: 'CITC Drop-off Desk',
+        description: 'Lost & Found Collection Point',
+        operatingHours: 'Mon-Fri: 8:30 AM - 5:30 PM\nClosed on weekends',
+        contact: 'Tel: +603-4145-0456\nEmail: citc@tarc.edu.my',
+        color: Colors.orange.shade700,
+        position: _citcDeskLocation,
+      ),
+      'blockA': LocationInfo(
+        name: 'Block A Drop-off Desk',
+        description: 'Academic Block',
+        operatingHours: 'Mon-Fri: 7:00 AM - 10:00 PM\nSat-Sun: 8:00 AM - 6:00 PM',
+        contact: 'Tel: +603-4145-0111',
+        color: Colors.purple.shade600,
+        position: _blockALocation,
+      ),
+      'blockD': LocationInfo(
+        name: 'Block D Drop-off Desk',
+        description: 'Academic Block',
+        operatingHours: 'Mon-Fri: 7:00 AM - 10:00 PM\nSat-Sun: 8:00 AM - 6:00 PM',
+        contact: 'Tel: +603-4145-0222',
+        color: Colors.teal.shade600,
+        position: _blockDLocation,
+      ),
+      'blockQ': LocationInfo(
+        name: 'Block Q Drop-off Desk',
+        description: 'Academic Block',
+        operatingHours: 'Mon-Fri: 7:00 AM - 10:00 PM\nSat-Sun: 8:00 AM - 6:00 PM',
+        contact: 'Tel: +603-4145-0333',
+        color: Colors.pink.shade600,
+        position: _blockQLocation,
+      ),
+      'sportComplex': LocationInfo(
+        name: 'Sport Complex Drop-off Desk',
+        description: 'Sports & Recreation Facility',
+        operatingHours: 'Mon-Fri: 6:00 AM - 9:00 PM\nSat-Sun: 7:00 AM - 7:00 PM',
+        contact: 'Tel: +603-4145-0444\nEmail: sports@tarc.edu.my',
+        color: Colors.yellow.shade600,
+        position: _sportComplexLocation,
+      ),
+      'blockSB': LocationInfo(
+        name: 'Block SB Drop-off Desk',
+        description: 'Academic Block',
+        operatingHours: 'Mon-Fri: 7:00 AM - 10:00 PM\nSat-Sun: 8:00 AM - 6:00 PM',
+        contact: 'Tel: +603-4145-0555',
+        color: Colors.brown.shade600,
+        position: _blockSBLocation,
+      ),
+    };
+  }
 
   void _recenterMap() {
     _mapController.move(_campusCenter, 16.5);
@@ -165,6 +254,31 @@ class _CampusMapPageState extends State<CampusMapPage> {
           SnackBar(content: Text('Error getting location: $e')),
         );
       }
+    }
+  }
+
+  // Get directions to a specific location
+  Future<void> _getDirectionsTo(String markerType) async {
+    final locationInfo = _locationDatabase[markerType];
+    if (locationInfo == null) return;
+
+    setState(() {
+      _endPoint = locationInfo.position;
+    });
+
+    _mapController.move(locationInfo.position, 17.0);
+
+    if (_startPoint == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a start point first'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } else {
+      await _calculateRoute();
     }
   }
 
@@ -363,162 +477,88 @@ class _CampusMapPageState extends State<CampusMapPage> {
                 ),
               MarkerLayer(
                 markers: [
-                  // Library
                   Marker(
                     point: _libraryDeskLocation,
                     width: 40,
                     height: 40,
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedMarker = 'library';
-                        });
-                      },
-                      child: Icon(
-                        Icons.location_on,
-                        size: 40,
-                        color: Colors.blue.shade700,
-                      ),
+                      onTap: () => setState(() => _selectedMarker = 'library'),
+                      child: Icon(Icons.location_on, size: 40, color: Colors.blue.shade700),
                     ),
                   ),
-                  // CITC
                   Marker(
                     point: _citcDeskLocation,
                     width: 40,
                     height: 40,
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedMarker = 'citc';
-                        });
-                      },
-                      child: Icon(
-                        Icons.location_on,
-                        size: 40,
-                        color: Colors.orange.shade700,
-                      ),
+                      onTap: () => setState(() => _selectedMarker = 'citc'),
+                      child: Icon(Icons.location_on, size: 40, color: Colors.orange.shade700),
                     ),
                   ),
-                  // Block A
                   Marker(
                     point: _blockALocation,
                     width: 40,
                     height: 40,
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedMarker = 'blockA';
-                        });
-                      },
-                      child: Icon(
-                        Icons.location_on,
-                        size: 40,
-                        color: Colors.purple.shade600,
-                      ),
+                      onTap: () => setState(() => _selectedMarker = 'blockA'),
+                      child: Icon(Icons.location_on, size: 40, color: Colors.purple.shade600),
                     ),
                   ),
-                  // Block D
                   Marker(
                     point: _blockDLocation,
                     width: 40,
                     height: 40,
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedMarker = 'blockD';
-                        });
-                      },
-                      child: Icon(
-                        Icons.location_on,
-                        size: 40,
-                        color: Colors.teal.shade600,
-                      ),
+                      onTap: () => setState(() => _selectedMarker = 'blockD'),
+                      child: Icon(Icons.location_on, size: 40, color: Colors.teal.shade600),
                     ),
                   ),
-                  // Block Q
                   Marker(
                     point: _blockQLocation,
                     width: 40,
                     height: 40,
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedMarker = 'blockQ';
-                        });
-                      },
-                      child: Icon(
-                        Icons.location_on,
-                        size: 40,
-                        color: Colors.pink.shade600,
-                      ),
+                      onTap: () => setState(() => _selectedMarker = 'blockQ'),
+                      child: Icon(Icons.location_on, size: 40, color: Colors.pink.shade600),
                     ),
                   ),
-                  // Sport Complex
                   Marker(
                     point: _sportComplexLocation,
                     width: 40,
                     height: 40,
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedMarker = 'sportComplex';
-                        });
-                      },
-                      child: Icon(
-                        Icons.location_on,
-                        size: 40,
-                        color: Colors.yellow.shade600,
-                      ),
+                      onTap: () => setState(() => _selectedMarker = 'sportComplex'),
+                      child: Icon(Icons.location_on, size: 40, color: Colors.yellow.shade600),
                     ),
                   ),
-                  // Block SB
                   Marker(
                     point: _blockSBLocation,
                     width: 40,
                     height: 40,
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedMarker = 'blockSB';
-                        });
-                      },
-                      child: Icon(
-                        Icons.location_on,
-                        size: 40,
-                        color: Colors.brown.shade600,
-                      ),
+                      onTap: () => setState(() => _selectedMarker = 'blockSB'),
+                      child: Icon(Icons.location_on, size: 40, color: Colors.brown.shade600),
                     ),
                   ),
-                  // Start Point Marker
                   if (_startPoint != null)
                     Marker(
                       point: _startPoint!,
                       width: 50,
                       height: 50,
-                      child: Icon(
-                        Icons.place,
-                        size: 50,
-                        color: Colors.green.shade600,
-                      ),
+                      child: Icon(Icons.place, size: 50, color: Colors.green.shade600),
                     ),
-                  // End Point Marker
                   if (_endPoint != null)
                     Marker(
                       point: _endPoint!,
                       width: 50,
                       height: 50,
-                      child: Icon(
-                        Icons.place,
-                        size: 50,
-                        color: Colors.red.shade600,
-                      ),
+                      child: Icon(Icons.place, size: 50, color: Colors.red.shade600),
                     ),
                 ],
               ),
             ],
           ),
 
-          // Route Planning Card
           Positioned(
             bottom: 16,
             left: 16,
@@ -533,10 +573,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                   children: [
                     const Text(
                       'Route Planning',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -667,7 +704,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
 
-          // Location Dropdown
           Positioned(
             left: 16,
             top: 16,
@@ -681,10 +717,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                   children: [
                     const Text(
                       'Campus Drop-off Desks',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                     const SizedBox(height: 8),
                     DropdownButton<String>(
@@ -772,7 +805,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
 
-          // Info Window
           if (_selectedMarker != null)
             Positioned(
               top: 16,
@@ -780,7 +812,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
               child: _buildInfoWindow(),
             ),
 
-          // Get Current Location Button
           Positioned(
             left: 16,
             top: MediaQuery.of(context).size.height / 2 - 18,
@@ -793,7 +824,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
 
-          // Zoom Controls
           Positioned(
             right: 16,
             top: MediaQuery.of(context).size.height / 2 - 50,
@@ -806,10 +836,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                   backgroundColor: Colors.white,
                   onPressed: () {
                     final currentZoom = _mapController.camera.zoom;
-                    _mapController.move(
-                      _mapController.camera.center,
-                      currentZoom + 1,
-                    );
+                    _mapController.move(_mapController.camera.center, currentZoom + 1);
                   },
                   child: Icon(Icons.add, color: Colors.grey.shade800),
                 ),
@@ -820,10 +847,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                   backgroundColor: Colors.white,
                   onPressed: () {
                     final currentZoom = _mapController.camera.zoom;
-                    _mapController.move(
-                      _mapController.camera.center,
-                      currentZoom - 1,
-                    );
+                    _mapController.move(_mapController.camera.center, currentZoom - 1);
                   },
                   child: Icon(Icons.remove, color: Colors.grey.shade800),
                 ),
@@ -836,104 +860,139 @@ class _CampusMapPageState extends State<CampusMapPage> {
   }
 
   Widget _buildInfoWindow() {
-    String title;
-    String description;
-    Color color;
-
-    switch (_selectedMarker) {
-      case 'library':
-        title = 'Library Drop-off Desk';
-        description = 'Lost & Found Collection Point';
-        color = Colors.blue.shade700;
-        break;
-      case 'citc':
-        title = 'CITC Drop-off Desk';
-        description = 'Lost & Found Collection Point';
-        color = Colors.orange.shade700;
-        break;
-      case 'blockA':
-        title = 'Block A';
-        description = 'Academic Block';
-        color = Colors.purple.shade600;
-        break;
-      case 'blockD':
-        title = 'Block D';
-        description = 'Academic Block';
-        color = Colors.teal.shade600;
-        break;
-      case 'blockQ':
-        title = 'Block Q';
-        description = 'Academic Block';
-        color = Colors.pink.shade600;
-        break;
-      case 'sportComplex':
-        title = 'Sport Complex';
-        description = 'Sports & Recreation Facility';
-        color = Colors.yellow.shade600;
-        break;
-      case 'blockSB':
-        title = 'Block SB';
-        description = 'Academic Block';
-        color = Colors.brown.shade600;
-        break;
-      default:
-        title = 'Unknown Location';
-        description = '';
-        color = Colors.grey.shade700;
-    }
+    final locationInfo = _locationDatabase[_selectedMarker];
+    if (locationInfo == null) return const SizedBox.shrink();
 
     return Card(
-      elevation: 6,
+      elevation: 8,
       child: Container(
-        width: 250,
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.location_on, color: color, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+        width: 300,
+        constraints: const BoxConstraints(maxHeight: 400),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: locationInfo.color.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.location_on, color: locationInfo.color, size: 30),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            locationInfo.name,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            locationInfo.description,
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => setState(() => _selectedMarker = null),
+                      color: Colors.grey.shade600,
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
+                ),
+                const Divider(height: 20),
+
+                // Operating Hours
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.access_time, size: 18, color: Colors.grey.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Operating Hours',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            locationInfo.operatingHours,
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Contact Information
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.phone, size: 18, color: Colors.grey.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Contact',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            locationInfo.contact,
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Get Directions Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _getDirectionsTo(_selectedMarker!),
+                    icon: const Icon(Icons.directions, size: 20),
+                    label: const Text('Get Directions'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: locationInfo.color,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            IconButton(
-              icon: const Icon(Icons.close, size: 18),
-              onPressed: () {
-                setState(() {
-                  _selectedMarker = null;
-                });
-              },
-              color: Colors.grey.shade600,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
+          ),
         ),
       ),
     );
