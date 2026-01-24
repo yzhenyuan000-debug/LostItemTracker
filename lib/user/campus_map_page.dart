@@ -16,8 +16,17 @@ class _CampusMapPageState extends State<CampusMapPage> {
   final MapController _mapController = MapController();
 
   static const LatLng _campusCenter = LatLng(3.2158, 101.7306);
+
+  // Drop-off Desks
   static const LatLng _libraryDeskLocation = LatLng(3.2172500, 101.7276667);
   static const LatLng _citcDeskLocation = LatLng(3.2139167, 101.7265000);
+
+  // Campus Blocks (DMS converted to decimal degrees)
+  static const LatLng _blockALocation = LatLng(3.21525, 101.72664);
+  static const LatLng _blockDLocation = LatLng(3.21667, 101.72667);
+  static const LatLng _blockQLocation = LatLng(3.21800, 101.72698);
+  static const LatLng _sportComplexLocation = LatLng(3.21814, 101.72970);
+  static const LatLng _blockSBLocation = LatLng(3.21642, 101.73339);
 
   final List<LatLng> _campusBoundary = const [
     LatLng(3.2149188, 101.7284679),
@@ -79,7 +88,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
 
   LatLng? _userLocation;
   String? _selectedMarker;
-  String? _selectedDesk;
+  String? _selectedLocation;
 
   void _recenterMap() {
     _mapController.move(_campusCenter, 16.5);
@@ -228,28 +237,57 @@ class _CampusMapPageState extends State<CampusMapPage> {
 
   String _calculateWalkingTime(double meters) {
     const double walkingSpeedKmh = 5.0;
-    double kilometers = meters / 1000;
-    double hours = kilometers / walkingSpeedKmh;
-    int minutes = (hours * 60).round();
-    return '$minutes min';
+    double totalMinutes = (meters / 1000) / walkingSpeedKmh * 60;
+    int hours = totalMinutes ~/ 60;
+    int minutes = (totalMinutes % 60).round();
+    if (hours > 0) {
+      return '$hours h $minutes min';
+    } else {
+      return '$minutes min';
+    }
   }
 
-  void _onDeskSelected(String? desk) {
-    if (desk == null) return;
+  void _onLocationSelected(String? location) {
+    if (location == null) return;
 
     setState(() {
-      _selectedDesk = desk;
+      _selectedLocation = location;
     });
 
     LatLng targetLocation;
     String markerType;
 
-    if (desk == 'Library Desk') {
-      targetLocation = _libraryDeskLocation;
-      markerType = 'library';
-    } else {
-      targetLocation = _citcDeskLocation;
-      markerType = 'citc';
+    switch (location) {
+      case 'Library':
+        targetLocation = _libraryDeskLocation;
+        markerType = 'library';
+        break;
+      case 'CITC':
+        targetLocation = _citcDeskLocation;
+        markerType = 'citc';
+        break;
+      case 'Block A':
+        targetLocation = _blockALocation;
+        markerType = 'blockA';
+        break;
+      case 'Block D':
+        targetLocation = _blockDLocation;
+        markerType = 'blockD';
+        break;
+      case 'Block Q':
+        targetLocation = _blockQLocation;
+        markerType = 'blockQ';
+        break;
+      case 'Sport Complex':
+        targetLocation = _sportComplexLocation;
+        markerType = 'sportComplex';
+        break;
+      case 'Block SB':
+        targetLocation = _blockSBLocation;
+        markerType = 'blockSB';
+        break;
+      default:
+        return;
     }
 
     _mapController.move(targetLocation, 18.0);
@@ -325,6 +363,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                 ),
               MarkerLayer(
                 markers: [
+                  // Library
                   Marker(
                     point: _libraryDeskLocation,
                     width: 40,
@@ -342,6 +381,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                       ),
                     ),
                   ),
+                  // CITC
                   Marker(
                     point: _citcDeskLocation,
                     width: 40,
@@ -359,6 +399,97 @@ class _CampusMapPageState extends State<CampusMapPage> {
                       ),
                     ),
                   ),
+                  // Block A
+                  Marker(
+                    point: _blockALocation,
+                    width: 40,
+                    height: 40,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedMarker = 'blockA';
+                        });
+                      },
+                      child: Icon(
+                        Icons.location_on,
+                        size: 40,
+                        color: Colors.purple.shade600,
+                      ),
+                    ),
+                  ),
+                  // Block D
+                  Marker(
+                    point: _blockDLocation,
+                    width: 40,
+                    height: 40,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedMarker = 'blockD';
+                        });
+                      },
+                      child: Icon(
+                        Icons.location_on,
+                        size: 40,
+                        color: Colors.teal.shade600,
+                      ),
+                    ),
+                  ),
+                  // Block Q
+                  Marker(
+                    point: _blockQLocation,
+                    width: 40,
+                    height: 40,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedMarker = 'blockQ';
+                        });
+                      },
+                      child: Icon(
+                        Icons.location_on,
+                        size: 40,
+                        color: Colors.pink.shade600,
+                      ),
+                    ),
+                  ),
+                  // Sport Complex
+                  Marker(
+                    point: _sportComplexLocation,
+                    width: 40,
+                    height: 40,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedMarker = 'sportComplex';
+                        });
+                      },
+                      child: Icon(
+                        Icons.location_on,
+                        size: 40,
+                        color: Colors.yellow.shade600,
+                      ),
+                    ),
+                  ),
+                  // Block SB
+                  Marker(
+                    point: _blockSBLocation,
+                    width: 40,
+                    height: 40,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedMarker = 'blockSB';
+                        });
+                      },
+                      child: Icon(
+                        Icons.location_on,
+                        size: 40,
+                        color: Colors.brown.shade600,
+                      ),
+                    ),
+                  ),
+                  // Start Point Marker
                   if (_startPoint != null)
                     Marker(
                       point: _startPoint!,
@@ -370,6 +501,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                         color: Colors.green.shade600,
                       ),
                     ),
+                  // End Point Marker
                   if (_endPoint != null)
                     Marker(
                       point: _endPoint!,
@@ -386,6 +518,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ],
           ),
 
+          // Route Planning Card
           Positioned(
             bottom: 16,
             left: 16,
@@ -534,6 +667,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
 
+          // Location Dropdown
           Positioned(
             left: 16,
             top: 16,
@@ -546,7 +680,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Drop-off Desks',
+                      'Campus Drop-off Desks',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -554,33 +688,83 @@ class _CampusMapPageState extends State<CampusMapPage> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButton<String>(
-                      value: _selectedDesk,
-                      hint: const Text('Select Desk', style: TextStyle(fontSize: 13)),
+                      value: _selectedLocation,
+                      hint: const Text('Select Location', style: TextStyle(fontSize: 13)),
                       isExpanded: false,
                       underline: Container(),
                       items: const [
                         DropdownMenuItem(
-                          value: 'Library Desk',
+                          value: 'Library',
                           child: Row(
                             children: [
                               Icon(Icons.location_on, size: 16, color: Colors.blue),
                               SizedBox(width: 8),
-                              Text('Library Desk', style: TextStyle(fontSize: 13)),
+                              Text('Library', style: TextStyle(fontSize: 13)),
                             ],
                           ),
                         ),
                         DropdownMenuItem(
-                          value: 'CITC Desk',
+                          value: 'CITC',
                           child: Row(
                             children: [
                               Icon(Icons.location_on, size: 16, color: Colors.orange),
                               SizedBox(width: 8),
-                              Text('CITC Desk', style: TextStyle(fontSize: 13)),
+                              Text('CITC', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Block A',
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on, size: 16, color: Colors.purple),
+                              SizedBox(width: 8),
+                              Text('Block A', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Block D',
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on, size: 16, color: Colors.teal),
+                              SizedBox(width: 8),
+                              Text('Block D', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Block Q',
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on, size: 16, color: Colors.pink),
+                              SizedBox(width: 8),
+                              Text('Block Q', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Sport Complex',
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on, size: 16, color: Colors.yellow),
+                              SizedBox(width: 8),
+                              Text('Sport Complex', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Block SB',
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on, size: 16, color: Colors.brown),
+                              SizedBox(width: 8),
+                              Text('Block SB', style: TextStyle(fontSize: 13)),
                             ],
                           ),
                         ),
                       ],
-                      onChanged: _onDeskSelected,
+                      onChanged: _onLocationSelected,
                     ),
                   ],
                 ),
@@ -588,6 +772,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
 
+          // Info Window
           if (_selectedMarker != null)
             Positioned(
               top: 16,
@@ -595,6 +780,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
               child: _buildInfoWindow(),
             ),
 
+          // Get Current Location Button
           Positioned(
             left: 16,
             top: MediaQuery.of(context).size.height / 2 - 18,
@@ -607,6 +793,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
 
+          // Zoom Controls
           Positioned(
             right: 16,
             top: MediaQuery.of(context).size.height / 2 - 50,
@@ -653,14 +840,46 @@ class _CampusMapPageState extends State<CampusMapPage> {
     String description;
     Color color;
 
-    if (_selectedMarker == 'library') {
-      title = 'Library Drop-off Desk';
-      description = 'Lost & Found Collection Point';
-      color = Colors.blue.shade700;
-    } else {
-      title = 'CITC Drop-off Desk';
-      description = 'Lost & Found Collection Point';
-      color = Colors.orange.shade700;
+    switch (_selectedMarker) {
+      case 'library':
+        title = 'Library Drop-off Desk';
+        description = 'Lost & Found Collection Point';
+        color = Colors.blue.shade700;
+        break;
+      case 'citc':
+        title = 'CITC Drop-off Desk';
+        description = 'Lost & Found Collection Point';
+        color = Colors.orange.shade700;
+        break;
+      case 'blockA':
+        title = 'Block A';
+        description = 'Academic Block';
+        color = Colors.purple.shade600;
+        break;
+      case 'blockD':
+        title = 'Block D';
+        description = 'Academic Block';
+        color = Colors.teal.shade600;
+        break;
+      case 'blockQ':
+        title = 'Block Q';
+        description = 'Academic Block';
+        color = Colors.pink.shade600;
+        break;
+      case 'sportComplex':
+        title = 'Sport Complex';
+        description = 'Sports & Recreation Facility';
+        color = Colors.yellow.shade600;
+        break;
+      case 'blockSB':
+        title = 'Block SB';
+        description = 'Academic Block';
+        color = Colors.brown.shade600;
+        break;
+      default:
+        title = 'Unknown Location';
+        description = '';
+        color = Colors.grey.shade700;
     }
 
     return Card(
