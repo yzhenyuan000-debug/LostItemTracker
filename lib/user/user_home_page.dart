@@ -17,6 +17,7 @@ class _UserHomePageState extends State<UserHomePage> {
   String? fullName;
   String? campusId;
   int _currentIndex = 0;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -45,6 +46,7 @@ class _UserHomePageState extends State<UserHomePage> {
   }
 
   Future<void> _handleLogout() async {
+    Navigator.pop(context); // Close drawer first
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -82,10 +84,10 @@ class _UserHomePageState extends State<UserHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: Row(
           children: [
-            // Logo placeholder - replace with actual logo asset
             Container(
               width: 40,
               height: 40,
@@ -116,12 +118,14 @@ class _UserHomePageState extends State<UserHomePage> {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _handleLogout,
-            tooltip: 'Logout',
+            icon: Icon(Icons.account_circle,
+              color: Colors.indigo.shade700,),
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
           ),
+          const SizedBox(width: 8),
         ],
       ),
+      endDrawer: _buildAccountDrawer(),
       body: RefreshIndicator(
         onRefresh: () async {
           await _loadUserData();
@@ -131,12 +135,12 @@ class _UserHomePageState extends State<UserHomePage> {
               const SnackBar(
                 content: Text('Refreshed'),
                 behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.only(
+                margin: EdgeInsets.only(
                   left: 16,
                   right: 16,
                   bottom: 1,
                 ),
-                duration: const Duration(seconds: 2),
+                duration: Duration(seconds: 2),
               ),
             );
           }
@@ -240,17 +244,16 @@ class _UserHomePageState extends State<UserHomePage> {
                         title: 'Find Item',
                         color: Colors.green.shade400,
                         onTap: () {
-                          // TODO: Navigate to find item page
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Find Item feature coming soon'),
                               behavior: SnackBarBehavior.floating,
-                              margin: const EdgeInsets.only(
+                              margin: EdgeInsets.only(
                                 left: 16,
                                 right: 16,
                                 bottom: 1,
                               ),
-                              duration: const Duration(seconds: 2),
+                              duration: Duration(seconds: 2),
                             ),
                           );
                         },
@@ -285,17 +288,16 @@ class _UserHomePageState extends State<UserHomePage> {
                         title: 'My Reports',
                         color: Colors.orange.shade400,
                         onTap: () {
-                          // TODO: Navigate to my reports page
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('My Reports feature coming soon'),
                               behavior: SnackBarBehavior.floating,
-                              margin: const EdgeInsets.only(
+                              margin: EdgeInsets.only(
                                 left: 16,
                                 right: 16,
                                 bottom: 1,
                               ),
-                              duration: const Duration(seconds: 2),
+                              duration: Duration(seconds: 2),
                             ),
                           );
                         },
@@ -381,6 +383,204 @@ class _UserHomePageState extends State<UserHomePage> {
     );
   }
 
+  Widget _buildAccountDrawer() {
+    return Drawer(
+      child: Container(
+        color: Colors.white,
+        child: Column(
+          children: [
+            // User Info Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.indigo.shade700,
+                    Colors.indigo.shade500,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.person,
+                      size: 50,
+                      color: Colors.indigo.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    fullName ?? 'Loading...',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    currentUser?.email ?? 'user@example.com',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'ID: ${campusId ?? 'N/A'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white60,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Menu Items
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _buildDrawerMenuItem(
+                    icon: Icons.person_outline,
+                    title: 'Profile',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: Navigate to Profile page
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Profile page coming soon'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerMenuItem(
+                    icon: Icons.qr_code,
+                    title: 'QR Code',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: Navigate to QR Code page
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('QR Code page coming soon'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerMenuItem(
+                    icon: Icons.card_giftcard,
+                    title: 'Rewards',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: Navigate to Rewards page
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Rewards page coming soon'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerMenuItem(
+                    icon: Icons.analytics_outlined,
+                    title: 'Analytics Report',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: Navigate to Analytics Report page
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Analytics Report page coming soon'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerMenuItem(
+                    icon: Icons.settings_outlined,
+                    title: 'Settings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: Navigate to Settings page
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Settings page coming soon'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Logout Button
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _handleLogout,
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Logout'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: Colors.indigo.shade700,
+        size: 26,
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: Colors.grey.shade400,
+      ),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+    );
+  }
+
   Widget _buildCustomBottomNav() {
     return BottomAppBar(
       shape: const CircularNotchedRectangle(),
@@ -408,7 +608,11 @@ class _UserHomePageState extends State<UserHomePage> {
         setState(() {
           _currentIndex = index;
         });
-        if (index != 0) {
+
+        if (index == 4) {
+          // Open account drawer
+          _scaffoldKey.currentState?.openEndDrawer();
+        } else if (index != 0) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Navigation to $label coming soon'),
