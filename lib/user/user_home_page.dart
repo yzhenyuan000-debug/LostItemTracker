@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_login_page.dart';
 import 'report_type_selection_page.dart';
 import 'campus_map_page.dart';
+import 'user_profile_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -452,13 +453,13 @@ class _UserHomePageState extends State<UserHomePage> {
                   _buildDrawerMenuItem(
                     icon: Icons.person_outline,
                     title: 'Profile',
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      // TODO: Navigate to Profile page
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Profile page coming soon'),
-                          behavior: SnackBarBehavior.floating,
+                      await Future.delayed(const Duration(milliseconds: 150));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UserProfilePage(),
                         ),
                       );
                     },
