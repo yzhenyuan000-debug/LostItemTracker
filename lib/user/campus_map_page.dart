@@ -4,24 +4,55 @@ import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-// Location data model
-class LocationInfo {
+class DropOffDesk {
+  final String id;
   final String name;
   final String description;
   final String operatingHours;
   final String contact;
-  final Color color;
-  final LatLng position;
+  final double latitude;
+  final double longitude;
+  final String colorHex;
+  final bool isActive;
 
-  LocationInfo({
+  DropOffDesk({
+    required this.id,
     required this.name,
     required this.description,
     required this.operatingHours,
     required this.contact,
-    required this.color,
-    required this.position,
+    required this.latitude,
+    required this.longitude,
+    required this.colorHex,
+    required this.isActive,
   });
+
+  factory DropOffDesk.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return DropOffDesk(
+      id: doc.id,
+      name: data['name'] ?? '',
+      description: data['description'] ?? '',
+      operatingHours: data['operatingHours'] ?? '',
+      contact: data['contact'] ?? '',
+      latitude: (data['latitude'] ?? 0).toDouble(),
+      longitude: (data['longitude'] ?? 0).toDouble(),
+      colorHex: data['colorHex'] ?? '#000000',
+      isActive: data['isActive'] ?? false,
+    );
+  }
+
+  LatLng get position => LatLng(latitude, longitude);
+
+  Color get color {
+    try {
+      return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return Colors.grey;
+    }
+  }
 }
 
 class CampusMapPage extends StatefulWidget {
@@ -33,22 +64,7 @@ class CampusMapPage extends StatefulWidget {
 
 class _CampusMapPageState extends State<CampusMapPage> {
   final MapController _mapController = MapController();
-
   static const LatLng _campusCenter = LatLng(3.2158, 101.7306);
-
-  // Drop-off Desks
-  static const LatLng _libraryDeskLocation = LatLng(3.2172500, 101.7276667);
-  static const LatLng _citcDeskLocation = LatLng(3.2139167, 101.7265000);
-
-  // Campus Blocks
-  static const LatLng _blockALocation = LatLng(3.21525, 101.72664);
-  static const LatLng _blockDLocation = LatLng(3.21667, 101.72667);
-  static const LatLng _blockQLocation = LatLng(3.21800, 101.72698);
-  static const LatLng _sportComplexLocation = LatLng(3.21814, 101.72970);
-  static const LatLng _blockSBLocation = LatLng(3.21642, 101.73339);
-
-  // Location information database
-  late Map<String, LocationInfo> _locationDatabase;
 
   final List<LatLng> _campusBoundary = const [
     LatLng(3.2149188, 101.7284679),
@@ -100,6 +116,10 @@ class _CampusMapPageState extends State<CampusMapPage> {
     LatLng(3.2149188, 101.7284679),
   ];
 
+  List<DropOffDesk> _dropOffDesks = [];
+  bool _isLoadingDesks = true;
+  String? _loadError;
+
   LatLng? _startPoint;
   LatLng? _endPoint;
   List<LatLng> _routePoints = [];
@@ -109,74 +129,40 @@ class _CampusMapPageState extends State<CampusMapPage> {
   bool _isCalculatingRoute = false;
 
   LatLng? _userLocation;
-  String? _selectedMarker;
-  String? _selectedLocation;
+  String? _selectedDeskId;
+  String? _selectedDropdownId;
 
   @override
   void initState() {
     super.initState();
-    _initializeLocationDatabase();
+    _loadDropOffDesks();
   }
 
-  void _initializeLocationDatabase() {
-    _locationDatabase = {
-      'library': LocationInfo(
-        name: 'Library Drop-off Desk',
-        description: 'Lost & Found Collection Point',
-        operatingHours: 'Mon-Fri: 8:00 AM - 6:00 PM\nSat: 8:00 AM - 2:00 PM',
-        contact: 'Tel: +603-4145-0123\nEmail: library@tarc.edu.my',
-        color: Colors.blue.shade700,
-        position: _libraryDeskLocation,
-      ),
-      'citc': LocationInfo(
-        name: 'CITC Drop-off Desk',
-        description: 'Lost & Found Collection Point',
-        operatingHours: 'Mon-Fri: 8:30 AM - 5:30 PM\nClosed on weekends',
-        contact: 'Tel: +603-4145-0456\nEmail: citc@tarc.edu.my',
-        color: Colors.orange.shade700,
-        position: _citcDeskLocation,
-      ),
-      'blockA': LocationInfo(
-        name: 'Block A Drop-off Desk',
-        description: 'Academic Block',
-        operatingHours: 'Mon-Fri: 7:00 AM - 10:00 PM\nSat-Sun: 8:00 AM - 6:00 PM',
-        contact: 'Tel: +603-4145-0111',
-        color: Colors.purple.shade600,
-        position: _blockALocation,
-      ),
-      'blockD': LocationInfo(
-        name: 'Block D Drop-off Desk',
-        description: 'Academic Block',
-        operatingHours: 'Mon-Fri: 7:00 AM - 10:00 PM\nSat-Sun: 8:00 AM - 6:00 PM',
-        contact: 'Tel: +603-4145-0222',
-        color: Colors.teal.shade600,
-        position: _blockDLocation,
-      ),
-      'blockQ': LocationInfo(
-        name: 'Block Q Drop-off Desk',
-        description: 'Academic Block',
-        operatingHours: 'Mon-Fri: 7:00 AM - 10:00 PM\nSat-Sun: 8:00 AM - 6:00 PM',
-        contact: 'Tel: +603-4145-0333',
-        color: Colors.pink.shade600,
-        position: _blockQLocation,
-      ),
-      'sportComplex': LocationInfo(
-        name: 'Sport Complex Drop-off Desk',
-        description: 'Sports & Recreation Facility',
-        operatingHours: 'Mon-Fri: 6:00 AM - 9:00 PM\nSat-Sun: 7:00 AM - 7:00 PM',
-        contact: 'Tel: +603-4145-0444\nEmail: sports@tarc.edu.my',
-        color: Colors.yellow.shade600,
-        position: _sportComplexLocation,
-      ),
-      'blockSB': LocationInfo(
-        name: 'Block SB Drop-off Desk',
-        description: 'Academic Block',
-        operatingHours: 'Mon-Fri: 7:00 AM - 10:00 PM\nSat-Sun: 8:00 AM - 6:00 PM',
-        contact: 'Tel: +603-4145-0555',
-        color: Colors.brown.shade600,
-        position: _blockSBLocation,
-      ),
-    };
+  Future<void> _loadDropOffDesks() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('dropOffDesks')
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      final desks = snapshot.docs
+          .map((doc) => DropOffDesk.fromFirestore(doc))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _dropOffDesks = desks;
+          _isLoadingDesks = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadError = e.toString();
+          _isLoadingDesks = false;
+        });
+      }
+    }
   }
 
   void _recenterMap() {
@@ -257,16 +243,14 @@ class _CampusMapPageState extends State<CampusMapPage> {
     }
   }
 
-  // Get directions to a specific location
-  Future<void> _getDirectionsTo(String markerType) async {
-    final locationInfo = _locationDatabase[markerType];
-    if (locationInfo == null) return;
+  Future<void> _getDirectionsTo(String deskId) async {
+    final desk = _dropOffDesks.firstWhere((d) => d.id == deskId);
 
     setState(() {
-      _endPoint = locationInfo.position;
+      _endPoint = desk.position;
     });
 
-    _mapController.move(locationInfo.position, 17.0);
+    _mapController.move(desk.position, 17.0);
 
     if (_startPoint == null) {
       if (mounted) {
@@ -361,58 +345,82 @@ class _CampusMapPageState extends State<CampusMapPage> {
     }
   }
 
-  void _onLocationSelected(String? location) {
-    if (location == null) return;
+  void _onLocationSelected(String? deskId) {
+    if (deskId == null) return;
+
+    final desk = _dropOffDesks.firstWhere((d) => d.id == deskId);
 
     setState(() {
-      _selectedLocation = location;
+      _selectedDropdownId = deskId;
     });
 
-    LatLng targetLocation;
-    String markerType;
-
-    switch (location) {
-      case 'Library':
-        targetLocation = _libraryDeskLocation;
-        markerType = 'library';
-        break;
-      case 'CITC':
-        targetLocation = _citcDeskLocation;
-        markerType = 'citc';
-        break;
-      case 'Block A':
-        targetLocation = _blockALocation;
-        markerType = 'blockA';
-        break;
-      case 'Block D':
-        targetLocation = _blockDLocation;
-        markerType = 'blockD';
-        break;
-      case 'Block Q':
-        targetLocation = _blockQLocation;
-        markerType = 'blockQ';
-        break;
-      case 'Sport Complex':
-        targetLocation = _sportComplexLocation;
-        markerType = 'sportComplex';
-        break;
-      case 'Block SB':
-        targetLocation = _blockSBLocation;
-        markerType = 'blockSB';
-        break;
-      default:
-        return;
-    }
-
-    _mapController.move(targetLocation, 18.0);
+    _mapController.move(desk.position, 18.0);
 
     setState(() {
-      _selectedMarker = markerType;
+      _selectedDeskId = deskId;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingDesks) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Campus Map'),
+          backgroundColor: Colors.indigo.shade700,
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Campus Map'),
+          backgroundColor: Colors.indigo.shade700,
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
+              const SizedBox(height: 16),
+              Text(
+                'Error loading drop-off desks',
+                style: TextStyle(fontSize: 18, color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _loadError!,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isLoadingDesks = true;
+                    _loadError = null;
+                  });
+                  _loadDropOffDesks();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo.shade700,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Campus Map'),
@@ -443,7 +451,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                   _onMapTap(point);
                 } else {
                   setState(() {
-                    _selectedMarker = null;
+                    _selectedDeskId = null;
                   });
                 }
               },
@@ -477,69 +485,15 @@ class _CampusMapPageState extends State<CampusMapPage> {
                 ),
               MarkerLayer(
                 markers: [
-                  Marker(
-                    point: _libraryDeskLocation,
+                  ..._dropOffDesks.map((desk) => Marker(
+                    point: desk.position,
                     width: 40,
                     height: 40,
                     child: GestureDetector(
-                      onTap: () => setState(() => _selectedMarker = 'library'),
-                      child: Icon(Icons.location_on, size: 40, color: Colors.blue.shade700),
+                      onTap: () => setState(() => _selectedDeskId = desk.id),
+                      child: Icon(Icons.location_on, size: 40, color: desk.color),
                     ),
-                  ),
-                  Marker(
-                    point: _citcDeskLocation,
-                    width: 40,
-                    height: 40,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedMarker = 'citc'),
-                      child: Icon(Icons.location_on, size: 40, color: Colors.orange.shade700),
-                    ),
-                  ),
-                  Marker(
-                    point: _blockALocation,
-                    width: 40,
-                    height: 40,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedMarker = 'blockA'),
-                      child: Icon(Icons.location_on, size: 40, color: Colors.purple.shade600),
-                    ),
-                  ),
-                  Marker(
-                    point: _blockDLocation,
-                    width: 40,
-                    height: 40,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedMarker = 'blockD'),
-                      child: Icon(Icons.location_on, size: 40, color: Colors.teal.shade600),
-                    ),
-                  ),
-                  Marker(
-                    point: _blockQLocation,
-                    width: 40,
-                    height: 40,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedMarker = 'blockQ'),
-                      child: Icon(Icons.location_on, size: 40, color: Colors.pink.shade600),
-                    ),
-                  ),
-                  Marker(
-                    point: _sportComplexLocation,
-                    width: 40,
-                    height: 40,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedMarker = 'sportComplex'),
-                      child: Icon(Icons.location_on, size: 40, color: Colors.yellow.shade600),
-                    ),
-                  ),
-                  Marker(
-                    point: _blockSBLocation,
-                    width: 40,
-                    height: 40,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedMarker = 'blockSB'),
-                      child: Icon(Icons.location_on, size: 40, color: Colors.brown.shade600),
-                    ),
-                  ),
+                  )),
                   if (_startPoint != null)
                     Marker(
                       point: _startPoint!,
@@ -721,82 +675,22 @@ class _CampusMapPageState extends State<CampusMapPage> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButton<String>(
-                      value: _selectedLocation,
+                      value: _selectedDropdownId,
                       hint: const Text('Select Location', style: TextStyle(fontSize: 13)),
                       isExpanded: false,
                       underline: Container(),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Library',
+                      items: _dropOffDesks.map((desk) {
+                        return DropdownMenuItem<String>(
+                          value: desk.id,
                           child: Row(
                             children: [
-                              Icon(Icons.location_on, size: 16, color: Colors.blue),
-                              SizedBox(width: 8),
-                              Text('Library', style: TextStyle(fontSize: 13)),
+                              Icon(Icons.location_on, size: 16, color: desk.color),
+                              const SizedBox(width: 8),
+                              Text(desk.name, style: const TextStyle(fontSize: 13)),
                             ],
                           ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'CITC',
-                          child: Row(
-                            children: [
-                              Icon(Icons.location_on, size: 16, color: Colors.orange),
-                              SizedBox(width: 8),
-                              Text('CITC', style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Block A',
-                          child: Row(
-                            children: [
-                              Icon(Icons.location_on, size: 16, color: Colors.purple),
-                              SizedBox(width: 8),
-                              Text('Block A', style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Block D',
-                          child: Row(
-                            children: [
-                              Icon(Icons.location_on, size: 16, color: Colors.teal),
-                              SizedBox(width: 8),
-                              Text('Block D', style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Block Q',
-                          child: Row(
-                            children: [
-                              Icon(Icons.location_on, size: 16, color: Colors.pink),
-                              SizedBox(width: 8),
-                              Text('Block Q', style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Sport Complex',
-                          child: Row(
-                            children: [
-                              Icon(Icons.location_on, size: 16, color: Colors.yellow),
-                              SizedBox(width: 8),
-                              Text('Sport Complex', style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Block SB',
-                          child: Row(
-                            children: [
-                              Icon(Icons.location_on, size: 16, color: Colors.brown),
-                              SizedBox(width: 8),
-                              Text('Block SB', style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ],
+                        );
+                      }).toList(),
                       onChanged: _onLocationSelected,
                     ),
                   ],
@@ -805,7 +699,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
             ),
           ),
 
-          if (_selectedMarker != null)
+          if (_selectedDeskId != null)
             Positioned(
               top: 16,
               right: 16,
@@ -860,8 +754,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
   }
 
   Widget _buildInfoWindow() {
-    final locationInfo = _locationDatabase[_selectedMarker];
-    if (locationInfo == null) return const SizedBox.shrink();
+    final desk = _dropOffDesks.firstWhere((d) => d.id == _selectedDeskId);
 
     return Card(
       elevation: 8,
@@ -881,10 +774,10 @@ class _CampusMapPageState extends State<CampusMapPage> {
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: locationInfo.color.withOpacity(0.2),
+                        color: desk.color.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.location_on, color: locationInfo.color, size: 30),
+                      child: Icon(Icons.location_on, color: desk.color, size: 30),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -892,12 +785,12 @@ class _CampusMapPageState extends State<CampusMapPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            locationInfo.name,
+                            desk.name,
                             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            locationInfo.description,
+                            desk.description,
                             style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                           ),
                         ],
@@ -905,7 +798,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => setState(() => _selectedMarker = null),
+                      onPressed: () => setState(() => _selectedDeskId = null),
                       color: Colors.grey.shade600,
                       padding: EdgeInsets.zero,
                     ),
@@ -913,7 +806,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
                 ),
                 const Divider(height: 20),
 
-                // Operating Hours
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -933,7 +825,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            locationInfo.operatingHours,
+                            desk.operatingHours,
                             style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                           ),
                         ],
@@ -943,7 +835,6 @@ class _CampusMapPageState extends State<CampusMapPage> {
                 ),
                 const SizedBox(height: 12),
 
-                // Contact Information
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -963,7 +854,7 @@ class _CampusMapPageState extends State<CampusMapPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            locationInfo.contact,
+                            desk.contact,
                             style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                           ),
                         ],
@@ -973,15 +864,14 @@ class _CampusMapPageState extends State<CampusMapPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Get Directions Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => _getDirectionsTo(_selectedMarker!),
+                    onPressed: () => _getDirectionsTo(_selectedDeskId!),
                     icon: const Icon(Icons.directions, size: 20),
                     label: const Text('Get Directions'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: locationInfo.color,
+                      backgroundColor: desk.color,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
