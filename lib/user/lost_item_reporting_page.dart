@@ -708,47 +708,6 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: Colors.indigo.shade700,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Container(
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Step 1 of 2',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
                   Form(
                     key: _formKey,
                     child: Column(
@@ -781,10 +740,10 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                     ),
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
+                                        color: Colors.indigo.shade50,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: Colors.grey.shade300,
+                                          color: Colors.indigo.shade50,
                                           width: 2,
                                         ),
                                       ),
@@ -817,7 +776,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                             Icons.add_a_photo,
                                             size: 48,
                                             color:
-                                            Colors.grey.shade400,
+                                            Colors.indigo.shade700,
                                           ),
                                           const SizedBox(height: 12),
                                           Text(
@@ -825,7 +784,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                             style: TextStyle(
                                               fontSize: 14,
                                               color:
-                                              Colors.grey.shade600,
+                                              Colors.indigo.shade700,
                                             ),
                                           ),
                                           const SizedBox(height: 4),
@@ -834,7 +793,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                             style: TextStyle(
                                               fontSize: 12,
                                               color:
-                                              Colors.grey.shade500,
+                                              Colors.indigo.shade500,
                                             ),
                                           ),
                                         ],
@@ -964,128 +923,127 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                         ),
                         const SizedBox(height: 12),
 
-                        // ==================== UI OVERFLOW FIX ====================
-                        // Root cause: The Container had a fixed height (150) but content
-                        // could exceed this when address + coordinates + radius badge were shown.
-                        //
-                        // Solution: Remove fixed height, use min/max constraints with
-                        // intrinsic sizing, and add scrollability for long addresses.
-                        InkWell(
-                          onTap: _selectLocation,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            // REMOVED: height: 150 (this was causing overflow)
-                            // ADDED: Flexible constraints instead
-                            constraints: const BoxConstraints(
-                              minHeight: 120,
-                              maxHeight: 180,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
+                        Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 1.0,
+                            child: InkWell(
+                              onTap: _selectLocation,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: _latitude != null && _longitude != null
-                                    ? Colors.indigo.shade700
-                                    : Colors.grey.shade300,
-                                width: 2,
-                              ),
-                            ),
-                            child: _latitude != null && _longitude != null
-                                ? Center(
-                              child: SingleChildScrollView(
-                                // ADDED: Allows content to scroll if too tall
-                                padding: const EdgeInsets.all(12.0),
-                                child: Column(
+                              child: Container(
+                                // REMOVED: height: 150 (this was causing overflow)
+                                // ADDED: Flexible constraints instead
+                                constraints: const BoxConstraints(
+                                  minHeight: 120,
+                                  maxHeight: 180,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.indigo.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _latitude != null && _longitude != null
+                                        ? Colors.indigo.shade50
+                                        : Colors.indigo.shade50,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: _latitude != null && _longitude != null
+                                    ? Center(
+                                  child: SingleChildScrollView(
+                                    // ADDED: Allows content to scroll if too tall
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.location_on,
+                                          size: 40, // Reduced from 48
+                                          color: Colors.indigo.shade700,
+                                        ),
+                                        const SizedBox(height: 6), // Reduced from 8
+                                        // ADDED: Flexible text with maxLines
+                                        Flexible(
+                                          child: Text(
+                                            _selectedAddress ?? 'Location selected',
+                                            style: TextStyle(
+                                              fontSize: 13, // Reduced from 14
+                                              color: Colors.indigo.shade800,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        // ADDED: Flexible for coordinates
+                                        Flexible(
+                                          child: Text(
+                                            'Lat: ${_latitude!.toStringAsFixed(5)}, '
+                                                'Lng: ${_longitude!.toStringAsFixed(5)}',
+                                            style: TextStyle(
+                                              fontSize: 11, // Reduced from 12
+                                              color: Colors.indigo.shade600,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (_locationRadius != null) ...[
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3, // Reduced from 4
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.shade50,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.radio_button_unchecked,
+                                                  size: 12, // Reduced from 14
+                                                  color: Colors.red.shade700,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  'Range: ${_formatRadius(_locationRadius!)}',
+                                                  style: TextStyle(
+                                                    fontSize: 10, // Reduced from 11
+                                                    color: Colors.red.shade700,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                )
+                                    : Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      Icons.location_on,
-                                      size: 40, // Reduced from 48
+                                      Icons.add_location,
+                                      size: 48,
                                       color: Colors.indigo.shade700,
                                     ),
-                                    const SizedBox(height: 6), // Reduced from 8
-                                    // ADDED: Flexible text with maxLines
-                                    Flexible(
-                                      child: Text(
-                                        _selectedAddress ?? 'Location selected',
-                                        style: TextStyle(
-                                          fontSize: 13, // Reduced from 14
-                                          color: Colors.grey.shade800,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Tap to select location',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.indigo.shade700,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    // ADDED: Flexible for coordinates
-                                    Flexible(
-                                      child: Text(
-                                        'Lat: ${_latitude!.toStringAsFixed(5)}, '
-                                            'Lng: ${_longitude!.toStringAsFixed(5)}',
-                                        style: TextStyle(
-                                          fontSize: 11, // Reduced from 12
-                                          color: Colors.grey.shade600,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (_locationRadius != null) ...[
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3, // Reduced from 4
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.shade50,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.radio_button_unchecked,
-                                              size: 12, // Reduced from 14
-                                              color: Colors.red.shade700,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'Range: ${_formatRadius(_locationRadius!)}',
-                                              style: TextStyle(
-                                                fontSize: 10, // Reduced from 11
-                                                color: Colors.red.shade700,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ),
-                            )
-                                : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.add_location,
-                                  size: 48,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'Tap to select location',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
                         ),
@@ -1179,70 +1137,80 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                         const SizedBox(height: 40),
 
                         // Submit Report Button
-                        SizedBox(
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: _isSubmitting ? null : _submitReport,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.indigo.shade700,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              disabledBackgroundColor: Colors.grey.shade400,
-                            ),
-                            child: _isSubmitting
-                                ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                                : const Text(
-                              'Submit Report',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                        Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.8,
+                            child: SizedBox(
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: _isSubmitting ? null : _submitReport,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.indigo.shade700,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  disabledBackgroundColor: Colors.grey.shade400,
+                                ),
+                                child: _isSubmitting
+                                    ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                                    : const Text(
+                                  'Submit Report',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ),
 
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 20),
 
                         // Save as Draft Button
-                        SizedBox(
-                          height: 50,
-                          child: OutlinedButton(
-                            onPressed: _isSubmitting ? null : _saveAsDraft,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.indigo.shade700,
-                              side: BorderSide(
-                                color: Colors.indigo.shade700,
-                                width: 2,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              disabledForegroundColor: Colors.grey.shade400,
-                            ),
-                            child: _isSubmitting
-                                ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.indigo.shade700),
-                              ),
-                            )
-                                : const Text(
-                              'Save as Draft',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                        Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.8,
+                            child: SizedBox(
+                              height: 50,
+                              child: OutlinedButton(
+                                onPressed: _isSubmitting ? null : _saveAsDraft,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.indigo.shade700,
+                                  side: BorderSide(
+                                    color: Colors.indigo.shade700,
+                                    width: 2,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  disabledForegroundColor: Colors.grey.shade400,
+                                ),
+                                child: _isSubmitting
+                                    ? SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.indigo.shade700),
+                                  ),
+                                )
+                                    : const Text(
+                                  'Save as Draft',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
