@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'lost_item_reporting_page.dart';
+import 'found_item_reporting_page.dart';
 
 class ReportTypeSelectionPage extends StatelessWidget {
   const ReportTypeSelectionPage({super.key});
@@ -68,17 +69,10 @@ class ReportTypeSelectionPage extends StatelessWidget {
                 iconColor: Colors.orange.shade600,
                 iconBackgroundColor: Colors.orange.shade50,
                 onTap: () {
-                  // TODO: Navigate to report_found_item_page.dart
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Report Found Item page coming soon'),
-                      behavior: SnackBarBehavior.floating,
-                      margin: EdgeInsets.only(
-                        left: 16,
-                        right: 16,
-                        bottom: 1,
-                      ),
-                      duration: Duration(seconds: 2),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FoundItemReportingPage(),
                     ),
                   );
                 },
