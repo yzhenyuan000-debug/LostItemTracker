@@ -333,6 +333,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
     required DateTime foundDateTime,
     required String dropOffDeskId,
     required String reportStatus,
+    String? itemReturnStatus,
   }) {
     // Create a map with all non-image fields
     final otherFields = {
@@ -350,6 +351,10 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
       'reportStatus': reportStatus,
       'createdAt': DateTime.now().toIso8601String(), // Placeholder
     };
+
+    if (itemReturnStatus != null) {
+      otherFields['itemReturnStatus'] = itemReturnStatus;
+    }
 
     // Convert to JSON and encode to UTF-8 to get byte size
     final jsonString = jsonEncode(otherFields);
@@ -549,6 +554,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         foundDateTime: _foundDateTime!,
         dropOffDeskId: _selectedDropOffDeskId!,
         reportStatus: 'submitted',
+        itemReturnStatus: 'pending',
       );
 
       print('Other fields size: $otherFieldsBytes bytes');
@@ -610,6 +616,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         'foundDateTime': Timestamp.fromDate(_foundDateTime!),
         'dropOffDeskId': _selectedDropOffDeskId!,
         'reportStatus': 'submitted',
+        'itemReturnStatus': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       };
 

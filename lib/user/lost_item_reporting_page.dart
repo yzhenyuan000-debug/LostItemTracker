@@ -243,6 +243,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
     required String locationDescription,
     required DateTime lostDateTime,
     required String reportStatus,
+    String? itemReturnStatus,
   }) {
     // Create a map with all non-image fields
     final otherFields = {
@@ -259,6 +260,10 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
       'reportStatus': reportStatus,
       'createdAt': DateTime.now().toIso8601String(), // Placeholder
     };
+
+    if (itemReturnStatus != null) {
+      otherFields['itemReturnStatus'] = itemReturnStatus;
+    }
 
     // Convert to JSON and encode to UTF-8 to get byte size
     final jsonString = jsonEncode(otherFields);
@@ -437,6 +442,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         locationDescription: _locationDescriptionController.text.trim(),
         lostDateTime: _lostDateTime!,
         reportStatus: 'submitted',
+        itemReturnStatus: 'pending',
       );
 
       print('Other fields size: $otherFieldsBytes bytes');
@@ -500,6 +506,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         'locationDescription': _locationDescriptionController.text.trim(),
         'lostDateTime': Timestamp.fromDate(_lostDateTime!),
         'reportStatus': 'submitted',
+        'itemReturnStatus': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       };
 
