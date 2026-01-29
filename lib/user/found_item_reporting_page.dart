@@ -858,7 +858,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                         border: Border.all(
                                           color: _compressedImageBytes != null
                                               ? Colors.indigo.shade50
-                                              : Colors.indigo.shade300,
+                                              : Colors.indigo.shade50,
                                           width: 2,
                                         ),
                                       ),
@@ -978,6 +978,10 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                           controller: _itemNameController,
                           decoration: InputDecoration(
                             hintText: 'e.g. Black iPhone 13',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 14,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -1010,6 +1014,10 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                           maxLines: 5,
                           decoration: InputDecoration(
                             hintText: 'Describe the item in detail (color, brand, special marks, etc.)',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 14,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -1172,6 +1180,10 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                           maxLines: 3,
                           decoration: InputDecoration(
                             hintText: 'e.g. Near the library entrance, beside the vending machine',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 14,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

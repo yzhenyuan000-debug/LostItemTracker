@@ -863,6 +863,10 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                           controller: _itemNameController,
                           decoration: InputDecoration(
                             hintText: 'e.g. Black iPhone 13',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 14,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -895,6 +899,10 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                           maxLines: 5,
                           decoration: InputDecoration(
                             hintText: 'Describe the item in detail (color, brand, special marks, etc.)',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 14,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -1064,6 +1072,10 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                           maxLines: 3,
                           decoration: InputDecoration(
                             hintText: 'e.g. Near the library entrance, beside the vending machine',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 14,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
