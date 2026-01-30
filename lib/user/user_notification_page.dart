@@ -1,0 +1,634 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+
+class UserNotificationPage extends StatefulWidget {
+  const UserNotificationPage({super.key});
+
+  @override
+  State<UserNotificationPage> createState() => _UserNotificationPageState();
+}
+
+class _UserNotificationPageState extends State<UserNotificationPage> {
+  final User? currentUser = FirebaseAuth.instance.currentUser;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Notifications'),
+        backgroundColor: Colors.indigo.shade700,
+        foregroundColor: Colors.white,
+      ),
+      body: currentUser == null
+          ? const Center(
+        child: Text('Please log in to view notifications'),
+      )
+          : StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('user_notifications')
+            .where('userId', isEqualTo: currentUser!.uid)
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.red.shade400,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading notifications',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    snapshot.error.toString(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          final notifications = snapshot.data?.docs ?? [];
+
+          if (notifications.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.notifications_none,
+                    size: 80,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No Notifications',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'When we find matches for your items,\nthey will appear here',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              // The stream will automatically refresh
+              await Future.delayed(const Duration(milliseconds: 500));
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: notifications.length,
+              itemBuilder: (context, index) {
+                final notificationDoc = notifications[index];
+                final notification =
+                notificationDoc.data() as Map<String, dynamic>;
+
+                return _buildNotificationCard(
+                  context,
+                  notificationDoc.id,
+                  notification,
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildNotificationCard(
+      BuildContext context,
+      String notificationId,
+      Map<String, dynamic> notification,
+      ) {
+    final matchScore = (notification['matchScore'] ?? 0.0).toDouble();
+    final matchType = notification['matchType'] ?? 'lost';
+    final itemId = notification['itemId'] ?? '';
+    final matchedItemId = notification['matchedItemId'] ?? '';
+    final dropOffDeskId = notification['dropOffDeskId'];
+    final isRead = notification['isRead'] ?? false;
+    final createdAt = notification['createdAt'] as Timestamp?;
+    final scoreBreakdown = notification['scoreBreakdown'] as Map<String, dynamic>?;
+
+    // Determine colors based on match score
+    Color scoreColor;
+    Color backgroundColor;
+    String matchQuality;
+
+    if (matchScore >= 90) {
+      scoreColor = Colors.green.shade700;
+      backgroundColor = Colors.green.shade50;
+      matchQuality = 'Excellent Match';
+    } else if (matchScore >= 80) {
+      scoreColor = Colors.blue.shade700;
+      backgroundColor = Colors.blue.shade50;
+      matchQuality = 'High Match';
+    } else if (matchScore >= 70) {
+      scoreColor = Colors.orange.shade700;
+      backgroundColor = Colors.orange.shade50;
+      matchQuality = 'Good Match';
+    } else {
+      scoreColor = Colors.grey.shade700;
+      backgroundColor = Colors.grey.shade50;
+      matchQuality = 'Potential Match';
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: isRead ? 1 : 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isRead ? Colors.grey.shade200 : scoreColor.withOpacity(0.3),
+          width: isRead ? 1 : 2,
+        ),
+      ),
+      child: InkWell(
+        onTap: () => _handleNotificationTap(
+          context,
+          notificationId,
+          notification,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Row
+              Row(
+                children: [
+                  // Match Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: backgroundColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: scoreColor.withOpacity(0.5),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          size: 16,
+                          color: scoreColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${matchScore.toStringAsFixed(1)}% Match',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: scoreColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  // Unread indicator
+                  if (!isRead)
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.shade700,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Match Quality
+              Text(
+                matchQuality,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Description
+              Text(
+                matchType == 'lost'
+                    ? 'We found a potential match for your lost item!'
+                    : 'We found someone who may have lost the item you found!',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Item IDs (for debugging/reference)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.grey.shade200,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow(
+                      Icons.inventory,
+                      'Your Item',
+                      _truncateId(itemId),
+                    ),
+                    const SizedBox(height: 6),
+                    _buildInfoRow(
+                      Icons.search,
+                      'Matched Item',
+                      _truncateId(matchedItemId),
+                    ),
+                    if (dropOffDeskId != null) ...[
+                      const SizedBox(height: 6),
+                      FutureBuilder<DocumentSnapshot>(
+                        future: FirebaseFirestore.instance
+                            .collection('dropOffDesks')
+                            .doc(dropOffDeskId)
+                            .get(),
+                        builder: (context, deskSnapshot) {
+                          if (deskSnapshot.hasData &&
+                              deskSnapshot.data!.exists) {
+                            final deskData = deskSnapshot.data!.data()
+                            as Map<String, dynamic>;
+                            return _buildInfoRow(
+                              Icons.location_on,
+                              'Drop-off Desk',
+                              deskData['name'] ?? 'Unknown',
+                            );
+                          }
+                          return _buildInfoRow(
+                            Icons.location_on,
+                            'Drop-off Desk',
+                            'Loading...',
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              if (scoreBreakdown != null) ...[
+                const SizedBox(height: 12),
+                _buildScoreBreakdown(scoreBreakdown),
+              ],
+
+              const SizedBox(height: 12),
+
+              // Timestamp
+              Row(
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    size: 14,
+                    color: Colors.grey.shade500,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    createdAt != null
+                        ? _formatTimestamp(createdAt)
+                        : 'Just now',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Action Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _handleNotificationTap(
+                    context,
+                    notificationId,
+                    notification,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: scoreColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'View Details',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: Colors.grey.shade600,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade800,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScoreBreakdown(Map<String, dynamic> breakdown) {
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+      title: Text(
+        'Match Score Breakdown',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey.shade700,
+        ),
+      ),
+      children: [
+        ...breakdown.entries.map((entry) {
+          final score = (entry.value ?? 0.0).toDouble();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    _formatBreakdownKey(entry.key),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: LinearProgressIndicator(
+                    value: score / 25, // Normalize to max possible score
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.indigo.shade700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 40,
+                  child: Text(
+                    score.toStringAsFixed(1),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  String _formatBreakdownKey(String key) {
+    // Convert camelCase to Title Case
+    final result = key.replaceAllMapped(
+      RegExp(r'([A-Z])'),
+          (match) => ' ${match.group(0)}',
+    );
+    return result[0].toUpperCase() + result.substring(1);
+  }
+
+  String _truncateId(String id) {
+    if (id.length <= 12) return id;
+    return '${id.substring(0, 8)}...${id.substring(id.length - 4)}';
+  }
+
+  String _formatTimestamp(Timestamp timestamp) {
+    final now = DateTime.now();
+    final date = timestamp.toDate();
+    final difference = now.difference(date);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return DateFormat('MMM d, yyyy').format(date);
+    }
+  }
+
+  Future<void> _handleNotificationTap(
+      BuildContext context,
+      String notificationId,
+      Map<String, dynamic> notification,
+      ) async {
+    // Mark as read
+    if (!(notification['isRead'] ?? false)) {
+      await FirebaseFirestore.instance
+          .collection('user_notifications')
+          .doc(notificationId)
+          .update({'isRead': true});
+    }
+
+    // Navigate to item details
+    final matchType = notification['matchType'] ?? 'lost';
+    final itemId = notification['itemId'] ?? '';
+    final matchedItemId = notification['matchedItemId'] ?? '';
+
+    // Show dialog with details
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Match Details'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Match Score: ${notification['matchScore'].toStringAsFixed(1)}%',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                matchType == 'lost'
+                    ? 'A found item matches your lost item report!'
+                    : 'A lost item report matches your found item!',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Your Item ID: $itemId',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Matched Item ID: $matchedItemId',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              if (notification['dropOffDeskId'] != null) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Drop-off Desk Information',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FutureBuilder<DocumentSnapshot>(
+                  future: FirebaseFirestore.instance
+                      .collection('dropOffDesks')
+                      .doc(notification['dropOffDeskId'])
+                      .get(),
+                  builder: (context, deskSnapshot) {
+                    if (deskSnapshot.hasData &&
+                        deskSnapshot.data!.exists) {
+                      final deskData = deskSnapshot.data!.data()
+                      as Map<String, dynamic>;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Name: ${deskData['name'] ?? 'N/A'}'),
+                          Text('Hours: ${deskData['operatingHours'] ?? 'N/A'}'),
+                          Text('Contact: ${deskData['contact'] ?? 'N/A'}'),
+                        ],
+                      );
+                    }
+                    return const Text('Loading desk information...');
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // TODO: Navigate to item details page
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Item details view coming soon'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('View Item'),
+          ),
+        ],
+      ),
+    );
+  }
+}

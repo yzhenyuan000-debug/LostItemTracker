@@ -5,6 +5,7 @@ import 'user_login_page.dart';
 import 'report_type_selection_page.dart';
 import 'campus_map_page.dart';
 import 'user_profile_page.dart';
+import 'user_notification_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -19,11 +20,13 @@ class _UserHomePageState extends State<UserHomePage> {
   String? campusId;
   int _currentIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  int _unreadNotificationCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _listenToNotifications();
   }
 
   Future<void> _loadUserData() async {
@@ -44,6 +47,23 @@ class _UserHomePageState extends State<UserHomePage> {
         print('Error loading user data: $e');
       }
     }
+  }
+
+  void _listenToNotifications() {
+    if (currentUser == null) return;
+
+    FirebaseFirestore.instance
+        .collection('user_notifications')
+        .where('userId', isEqualTo: currentUser!.uid)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = snapshot.docs.length;
+        });
+      }
+    });
   }
 
   Future<void> _handleLogout() async {
@@ -469,7 +489,6 @@ class _UserHomePageState extends State<UserHomePage> {
                     title: 'QR Code',
                     onTap: () {
                       Navigator.pop(context);
-                      // TODO: Navigate to QR Code page
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('QR Code page coming soon'),
@@ -483,7 +502,6 @@ class _UserHomePageState extends State<UserHomePage> {
                     title: 'Rewards',
                     onTap: () {
                       Navigator.pop(context);
-                      // TODO: Navigate to Rewards page
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Rewards page coming soon'),
@@ -497,7 +515,6 @@ class _UserHomePageState extends State<UserHomePage> {
                     title: 'Analytics Report',
                     onTap: () {
                       Navigator.pop(context);
-                      // TODO: Navigate to Analytics Report page
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Analytics Report page coming soon'),
@@ -511,7 +528,6 @@ class _UserHomePageState extends State<UserHomePage> {
                     title: 'Settings',
                     onTap: () {
                       Navigator.pop(context);
-                      // TODO: Navigate to Settings page
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Settings page coming soon'),
@@ -594,7 +610,12 @@ class _UserHomePageState extends State<UserHomePage> {
             _buildNavItem(Icons.home, 'Home', 0),
             _buildNavItem(Icons.search, 'Search', 1),
             const SizedBox(width: 40), // Space for FAB
-            _buildNavItem(Icons.notifications_outlined, 'Notification', 3),
+            _buildNavItemWithBadge(
+              Icons.notifications_outlined,
+              'Notification',
+              3,
+              _unreadNotificationCount,
+            ),
             _buildNavItem(Icons.person, 'Account', 4),
           ],
         ),
@@ -645,6 +666,80 @@ class _UserHomePageState extends State<UserHomePage> {
               color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade500,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItemWithBadge(
+      IconData icon,
+      String label,
+      int index,
+      int badgeCount,
+      ) {
+    final isSelected = _currentIndex == index;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _currentIndex = index;
+        });
+
+        // Navigate to notification page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const UserNotificationPage(),
+          ),
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade500,
+                size: 24,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+          if (badgeCount > 0)
+            Positioned(
+              right: -6,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade600,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 18,
+                  minHeight: 18,
+                ),
+                child: Center(
+                  child: Text(
+                    badgeCount > 9 ? '9+' : badgeCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

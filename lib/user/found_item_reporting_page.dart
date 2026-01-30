@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'select_found_location_map.dart';
 import 'found_item_reporting_success_page.dart';
 import 'user_home_page.dart';
+import 'item_matching_service.dart';
 
 // ==================== FIRESTORE SIZE CONSTANTS ====================
 // These constants ensure we stay within Firestore document size limits
@@ -639,6 +640,15 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
           .add(reportData);
 
       print('Report submitted successfully with ID: ${docRef.id}');
+
+      try {
+        print('Starting matching process for found item...');
+        final matchingService = ItemMatchingService();
+        await matchingService.matchFoundItem(docRef.id);
+        print('Matching process completed');
+      } catch (e) {
+        print('Error during matching: $e');
+      }
 
       if (!mounted) return;
 

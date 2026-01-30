@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'select_location_map.dart';
 import 'lost_item_reporting_success_page.dart';
 import 'user_home_page.dart';
+import 'item_matching_service.dart';
 
 // ==================== FIRESTORE SIZE CONSTANTS ====================
 // These constants ensure we stay within Firestore document size limits
@@ -529,6 +530,15 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
           .add(reportData);
 
       print('Report submitted successfully with ID: ${docRef.id}');
+
+      try {
+        print('Starting matching process for lost item...');
+        final matchingService = ItemMatchingService();
+        await matchingService.matchLostItem(docRef.id);
+        print('Matching process completed');
+      } catch (e) {
+        print('Error during matching: $e');
+      }
 
       if (!mounted) return;
 
