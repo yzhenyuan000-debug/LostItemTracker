@@ -100,7 +100,19 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         _selectedCategory = data['category'] as String?;
         _itemNameController.text = data['itemName'] as String? ?? '';
         _descriptionController.text = data['itemDescription'] as String? ?? '';
-        _compressedImageBytes = data['photoBytes'] as Uint8List?;
+
+        // Convert photoBytes from List<dynamic> to Uint8List
+        final photoBytesData = data['photoBytes'];
+        if (photoBytesData != null) {
+          if (photoBytesData is Uint8List) {
+            _compressedImageBytes = photoBytesData;
+          } else if (photoBytesData is List) {
+            _compressedImageBytes = Uint8List.fromList(List<int>.from(photoBytesData));
+          }
+        } else {
+          _compressedImageBytes = null;
+        }
+
         _latitude = (data['latitude'] as num?)?.toDouble();
         _longitude = (data['longitude'] as num?)?.toDouble();
         _locationRadius = (data['locationRadius'] as num?)?.toDouble();

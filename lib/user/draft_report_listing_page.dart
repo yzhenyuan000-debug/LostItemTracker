@@ -250,7 +250,17 @@ class _DraftReportListingPageState extends State<DraftReportListingPage> {
     final itemName = data['itemName'] as String? ?? 'Untitled';
     final category = data['category'] as String? ?? 'Uncategorized';
     final createdAt = data['createdAt'] as Timestamp?;
-    final photoBytes = data['photoBytes'] as Uint8List?;
+
+    // Convert photoBytes from List<dynamic> to Uint8List
+    Uint8List? photoBytes;
+    final photoBytesData = data['photoBytes'];
+    if (photoBytesData != null) {
+      if (photoBytesData is Uint8List) {
+        photoBytes = photoBytesData;
+      } else if (photoBytesData is List) {
+        photoBytes = Uint8List.fromList(List<int>.from(photoBytesData));
+      }
+    }
 
     String formattedDate = 'Unknown date';
     if (createdAt != null) {
