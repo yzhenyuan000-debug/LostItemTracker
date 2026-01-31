@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'lost_item_report.dart';
+import 'found_item_report.dart';
 
 class UserNotificationPage extends StatefulWidget {
   const UserNotificationPage({super.key});
@@ -12,6 +14,63 @@ class UserNotificationPage extends StatefulWidget {
 
 class _UserNotificationPageState extends State<UserNotificationPage> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
+  bool _isMarkingAllAsRead = false;
+
+  Future<void> _markAllAsRead() async {
+    if (currentUser == null) return;
+
+    setState(() {
+      _isMarkingAllAsRead = true;
+    });
+
+    try {
+      // Get all unread notifications for current user
+      final QuerySnapshot unreadNotifications = await FirebaseFirestore.instance
+          .collection('user_notifications')
+          .where('userId', isEqualTo: currentUser!.uid)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      // Create a batch write
+      final WriteBatch batch = FirebaseFirestore.instance.batch();
+
+      // Update all unread notifications
+      for (var doc in unreadNotifications.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+
+      // Commit the batch
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${unreadNotifications.docs.length} notifications marked as read'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error marking notifications as read: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMarkingAllAsRead = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +79,39 @@ class _UserNotificationPageState extends State<UserNotificationPage> {
         title: const Text('Notifications'),
         backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
+        actions: [
+          if (currentUser != null)
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('user_notifications')
+                  .where('userId', isEqualTo: currentUser!.uid)
+                  .where('isRead', isEqualTo: false)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                final hasUnread = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+
+                return IconButton(
+                  icon: _isMarkingAllAsRead
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                      : Icon(
+                    Icons.done_all,
+                    color: hasUnread ? Colors.white : Colors.white54,
+                  ),
+                  tooltip: 'Mark all as read',
+                  onPressed: hasUnread && !_isMarkingAllAsRead
+                      ? _markAllAsRead
+                      : null,
+                );
+              },
+            ),
+        ],
       ),
       body: currentUser == null
           ? const Center(
@@ -585,10 +677,9 @@ class _UserNotificationPageState extends State<UserNotificationPage> {
                       .doc(notification['dropOffDeskId'])
                       .get(),
                   builder: (context, deskSnapshot) {
-                    if (deskSnapshot.hasData &&
-                        deskSnapshot.data!.exists) {
-                      final deskData = deskSnapshot.data!.data()
-                      as Map<String, dynamic>;
+                    if (deskSnapshot.hasData && deskSnapshot.data!.exists) {
+                      final deskData =
+                      deskSnapshot.data!.data() as Map<String, dynamic>;
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -613,13 +704,36 @@ class _UserNotificationPageState extends State<UserNotificationPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              // TODO: Navigate to item details page
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Item details view coming soon'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+
+              // Navigate to the appropriate report page
+              // For matchType 'lost': user lost item, matched with found item
+              // Show the matched found item report
+              // For matchType 'found': user found item, matched with lost item
+              // Show the matched lost item report
+
+              if (matchType == 'lost') {
+                // User's lost item matched with a found item
+                // Navigate to found item report (the matched item)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FoundItemReportPage(
+                      reportId: matchedItemId,
+                    ),
+                  ),
+                );
+              } else {
+                // User's found item matched with a lost item
+                // Navigate to lost item report (the matched item)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => LostItemReportPage(
+                      reportId: matchedItemId,
+                    ),
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.indigo.shade700,
