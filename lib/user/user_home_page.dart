@@ -6,6 +6,7 @@ import 'report_type_selection_page.dart';
 import 'campus_map_page.dart';
 import 'user_profile_page.dart';
 import 'user_notification_page.dart';
+import 'report_history_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -309,16 +310,10 @@ class _UserHomePageState extends State<UserHomePage> {
                         title: 'My Reports',
                         color: Colors.orange.shade400,
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('My Reports feature coming soon'),
-                              behavior: SnackBarBehavior.floating,
-                              margin: EdgeInsets.only(
-                                left: 16,
-                                right: 16,
-                                bottom: 1,
-                              ),
-                              duration: Duration(seconds: 2),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ReportHistoryPage(),
                             ),
                           );
                         },
