@@ -19,7 +19,9 @@ const int OVERHEAD_RESERVE_BYTES = 20000;        // Reserve for Firestore overhe
 const int MIN_IMAGE_BYTES = 10000;               // Minimum viable image size
 
 class LostItemReportingPage extends StatefulWidget {
-  const LostItemReportingPage({super.key});
+  final String? draftId; // Add draftId parameter for editing drafts
+
+  const LostItemReportingPage({super.key, this.draftId});
 
   @override
   State<LostItemReportingPage> createState() => _LostItemReportingPageState();
@@ -42,6 +44,10 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
   bool _isCompressingImage = false;
   bool _isSubmitting = false;
 
+  // Draft editing support
+  bool _isDraftMode = false;
+  bool _isLoadingDraft = false;
+
   final List<String> _categories = [
     'Electronics',
     'Documents',
@@ -54,11 +60,74 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.draftId != null) {
+      _loadDraftData();
+    }
+  }
+
+  @override
   void dispose() {
     _itemNameController.dispose();
     _descriptionController.dispose();
     _locationDescriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDraftData() async {
+    setState(() {
+      _isLoadingDraft = true;
+      _isDraftMode = true;
+    });
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('lost_item_reports')
+          .doc(widget.draftId)
+          .get();
+
+      if (!doc.exists || !mounted) {
+        setState(() {
+          _isLoadingDraft = false;
+        });
+        return;
+      }
+
+      final data = doc.data() as Map<String, dynamic>;
+
+      setState(() {
+        _selectedCategory = data['category'] as String?;
+        _itemNameController.text = data['itemName'] as String? ?? '';
+        _descriptionController.text = data['itemDescription'] as String? ?? '';
+        _compressedImageBytes = data['photoBytes'] as Uint8List?;
+        _latitude = (data['latitude'] as num?)?.toDouble();
+        _longitude = (data['longitude'] as num?)?.toDouble();
+        _locationRadius = (data['locationRadius'] as num?)?.toDouble();
+        _selectedAddress = data['address'] as String?;
+        _locationDescriptionController.text = data['locationDescription'] as String? ?? '';
+
+        final lostTimestamp = data['lostDateTime'] as Timestamp?;
+        if (lostTimestamp != null) {
+          _lostDateTime = lostTimestamp.toDate();
+        }
+
+        _isLoadingDraft = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDraft = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading draft: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _pickImage() async {
@@ -524,17 +593,46 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         );
       }
 
-      // Step 7: Add to Firestore
-      final docRef = await FirebaseFirestore.instance
-          .collection('lost_item_reports')
-          .add(reportData);
+      // Step 7: Add or Update Firestore
+      String reportId;
 
-      print('Report submitted successfully with ID: ${docRef.id}');
+      if (_isDraftMode && widget.draftId != null) {
+        // UPDATE existing draft
+        await FirebaseFirestore.instance
+            .collection('lost_item_reports')
+            .doc(widget.draftId)
+            .update({
+          'category': _selectedCategory!,
+          'itemName': _itemNameController.text.trim(),
+          'itemDescription': _descriptionController.text.trim(),
+          'photoBytes': finalImageBytes,
+          'latitude': _latitude!,
+          'longitude': _longitude!,
+          'locationRadius': _locationRadius ?? 50.0,
+          'address': _selectedAddress,
+          'locationDescription': _locationDescriptionController.text.trim(),
+          'lostDateTime': Timestamp.fromDate(_lostDateTime!),
+          'reportStatus': 'submitted', // Changed from 'draft' to 'submitted'
+          'itemReturnStatus': 'pending',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        reportId = widget.draftId!;
+        print('Draft updated and submitted with ID: $reportId');
+      } else {
+        // CREATE new report
+        final docRef = await FirebaseFirestore.instance
+            .collection('lost_item_reports')
+            .add(reportData);
+
+        reportId = docRef.id;
+        print('Report submitted successfully with ID: $reportId');
+      }
 
       try {
         print('Starting matching process for lost item...');
         final matchingService = ItemMatchingService();
-        await matchingService.matchLostItem(docRef.id);
+        await matchingService.matchLostItem(reportId);
         print('Matching process completed');
       } catch (e) {
         print('Error during matching: $e');
@@ -550,7 +648,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (context) => LostItemReportingSuccessPage(
-            reportId: docRef.id,
+            reportId: reportId,
           ),
         ),
             (route) => false,
@@ -651,13 +749,24 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         'locationDescription': _locationDescriptionController.text.trim(),
         'lostDateTime': _lostDateTime != null ? Timestamp.fromDate(_lostDateTime!) : null,
         'reportStatus': 'draft',
-        'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Add to Firestore
-      await FirebaseFirestore.instance
-          .collection('lost_item_reports')
-          .add(draftData);
+      if (_isDraftMode && widget.draftId != null) {
+        // UPDATE existing draft
+        draftData['updatedAt'] = FieldValue.serverTimestamp();
+
+        await FirebaseFirestore.instance
+            .collection('lost_item_reports')
+            .doc(widget.draftId)
+            .update(draftData);
+      } else {
+        // CREATE new draft
+        draftData['createdAt'] = FieldValue.serverTimestamp();
+
+        await FirebaseFirestore.instance
+            .collection('lost_item_reports')
+            .add(draftData);
+      }
 
       if (!mounted) return;
 
@@ -713,11 +822,22 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Report Lost Item'),
+        title: Text(_isDraftMode ? 'Edit Draft - Lost Item' : 'Report Lost Item'),
         backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
       ),
-      body: Stack(
+      body: _isLoadingDraft
+          ? const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading draft...'),
+          ],
+        ),
+      )
+          : Stack(
         children: [
           SingleChildScrollView(
             child: Padding(
@@ -955,8 +1075,6 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                               onTap: _selectLocation,
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
-                                // REMOVED: height: 150 (this was causing overflow)
-                                // ADDED: Flexible constraints instead
                                 constraints: const BoxConstraints(
                                   minHeight: 120,
                                   maxHeight: 180,
@@ -974,7 +1092,6 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                 child: _latitude != null && _longitude != null
                                     ? Center(
                                   child: SingleChildScrollView(
-                                    // ADDED: Allows content to scroll if too tall
                                     padding: const EdgeInsets.all(12.0),
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -982,16 +1099,15 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                       children: [
                                         Icon(
                                           Icons.location_on,
-                                          size: 40, // Reduced from 48
+                                          size: 40,
                                           color: Colors.indigo.shade700,
                                         ),
-                                        const SizedBox(height: 6), // Reduced from 8
-                                        // ADDED: Flexible text with maxLines
+                                        const SizedBox(height: 6),
                                         Flexible(
                                           child: Text(
                                             _selectedAddress ?? 'Location selected',
                                             style: TextStyle(
-                                              fontSize: 13, // Reduced from 14
+                                              fontSize: 13,
                                               color: Colors.indigo.shade800,
                                               fontWeight: FontWeight.w500,
                                             ),
@@ -1001,13 +1117,12 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        // ADDED: Flexible for coordinates
                                         Flexible(
                                           child: Text(
                                             'Lat: ${_latitude!.toStringAsFixed(5)}, '
                                                 'Lng: ${_longitude!.toStringAsFixed(5)}',
                                             style: TextStyle(
-                                              fontSize: 11, // Reduced from 12
+                                              fontSize: 11,
                                               color: Colors.indigo.shade600,
                                             ),
                                             maxLines: 1,
@@ -1019,7 +1134,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 8,
-                                              vertical: 3, // Reduced from 4
+                                              vertical: 3,
                                             ),
                                             decoration: BoxDecoration(
                                               color: Colors.red.shade50,
@@ -1030,14 +1145,14 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                               children: [
                                                 Icon(
                                                   Icons.radio_button_unchecked,
-                                                  size: 12, // Reduced from 14
+                                                  size: 12,
                                                   color: Colors.red.shade700,
                                                 ),
                                                 const SizedBox(width: 4),
                                                 Text(
                                                   'Range: ${_formatRadius(_locationRadius!)}',
                                                   style: TextStyle(
-                                                    fontSize: 10, // Reduced from 11
+                                                    fontSize: 10,
                                                     color: Colors.red.shade700,
                                                     fontWeight: FontWeight.w600,
                                                   ),

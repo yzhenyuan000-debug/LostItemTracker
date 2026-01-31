@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'lost_item_reporting_page.dart';
 import 'found_item_reporting_page.dart';
+import 'draft_report_listing_page.dart';
 
 class ReportTypeSelectionPage extends StatelessWidget {
   const ReportTypeSelectionPage({super.key});
@@ -73,6 +74,26 @@ class ReportTypeSelectionPage extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const FoundItemReportingPage(),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 20),
+
+              // Draft Report Card
+              _buildReportCard(
+                context: context,
+                title: 'Draft Report',
+                description: 'Continue working on your saved draft reports',
+                icon: Icons.drafts_outlined,
+                iconColor: Colors.purple.shade600,
+                iconBackgroundColor: Colors.purple.shade50,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DraftReportListingPage(),
                     ),
                   );
                 },

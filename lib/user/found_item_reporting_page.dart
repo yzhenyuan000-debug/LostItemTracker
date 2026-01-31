@@ -67,7 +67,9 @@ class DropOffDesk {
 }
 
 class FoundItemReportingPage extends StatefulWidget {
-  const FoundItemReportingPage({super.key});
+  final String? draftId; // Add draftId parameter for editing drafts
+
+  const FoundItemReportingPage({super.key, this.draftId});
 
   @override
   State<FoundItemReportingPage> createState() => _FoundItemReportingPageState();
@@ -95,6 +97,10 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
   List<DropOffDesk> _dropOffDesks = [];
   bool _isLoadingDesks = true;
 
+  // Draft editing support
+  bool _isDraftMode = false;
+  bool _isLoadingDraft = false;
+
   final List<String> _categories = [
     'Electronics',
     'Documents',
@@ -110,6 +116,9 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
   void initState() {
     super.initState();
     _loadDropOffDesks();
+    if (widget.draftId != null) {
+      _loadDraftData();
+    }
   }
 
   @override
@@ -118,6 +127,62 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
     _descriptionController.dispose();
     _locationDescriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDraftData() async {
+    setState(() {
+      _isLoadingDraft = true;
+      _isDraftMode = true;
+    });
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('found_item_reports')
+          .doc(widget.draftId)
+          .get();
+
+      if (!doc.exists || !mounted) {
+        setState(() {
+          _isLoadingDraft = false;
+        });
+        return;
+      }
+
+      final data = doc.data() as Map<String, dynamic>;
+
+      setState(() {
+        _selectedCategory = data['category'] as String?;
+        _itemNameController.text = data['itemName'] as String? ?? '';
+        _descriptionController.text = data['itemDescription'] as String? ?? '';
+        _compressedImageBytes = data['photoBytes'] as Uint8List?;
+        _latitude = (data['latitude'] as num?)?.toDouble();
+        _longitude = (data['longitude'] as num?)?.toDouble();
+        _locationRadius = (data['locationRadius'] as num?)?.toDouble();
+        _selectedAddress = data['address'] as String?;
+        _locationDescriptionController.text = data['locationDescription'] as String? ?? '';
+        _selectedDropOffDeskId = data['dropOffDeskId'] as String?;
+
+        final foundTimestamp = data['foundDateTime'] as Timestamp?;
+        if (foundTimestamp != null) {
+          _foundDateTime = foundTimestamp.toDate();
+        }
+
+        _isLoadingDraft = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDraft = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading draft: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadDropOffDesks() async {
@@ -634,17 +699,47 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         );
       }
 
-      // Step 7: Add to Firestore
-      final docRef = await FirebaseFirestore.instance
-          .collection('found_item_reports')
-          .add(reportData);
+      // Step 7: Add or Update Firestore
+      String reportId;
 
-      print('Report submitted successfully with ID: ${docRef.id}');
+      if (_isDraftMode && widget.draftId != null) {
+        // UPDATE existing draft
+        await FirebaseFirestore.instance
+            .collection('found_item_reports')
+            .doc(widget.draftId)
+            .update({
+          'category': _selectedCategory!,
+          'itemName': _itemNameController.text.trim(),
+          'itemDescription': _descriptionController.text.trim(),
+          'photoBytes': finalImageBytes,
+          'latitude': _latitude!,
+          'longitude': _longitude!,
+          'locationRadius': _locationRadius ?? 50.0,
+          'address': _selectedAddress,
+          'locationDescription': _locationDescriptionController.text.trim(),
+          'foundDateTime': Timestamp.fromDate(_foundDateTime!),
+          'dropOffDeskId': _selectedDropOffDeskId!,
+          'reportStatus': 'submitted', // Changed from 'draft' to 'submitted'
+          'itemReturnStatus': 'pending',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        reportId = widget.draftId!;
+        print('Draft updated and submitted with ID: $reportId');
+      } else {
+        // CREATE new report
+        final docRef = await FirebaseFirestore.instance
+            .collection('found_item_reports')
+            .add(reportData);
+
+        reportId = docRef.id;
+        print('Report submitted successfully with ID: $reportId');
+      }
 
       try {
         print('Starting matching process for found item...');
         final matchingService = ItemMatchingService();
-        await matchingService.matchFoundItem(docRef.id);
+        await matchingService.matchFoundItem(reportId);
         print('Matching process completed');
       } catch (e) {
         print('Error during matching: $e');
@@ -660,7 +755,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (context) => FoundItemReportingSuccessPage(
-            reportId: docRef.id,
+            reportId: reportId,
           ),
         ),
             (route) => false,
@@ -764,13 +859,24 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         'foundDateTime': _foundDateTime != null ? Timestamp.fromDate(_foundDateTime!) : null,
         'dropOffDeskId': _selectedDropOffDeskId,
         'reportStatus': 'draft',
-        'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Add to Firestore
-      await FirebaseFirestore.instance
-          .collection('found_item_reports')
-          .add(draftData);
+      if (_isDraftMode && widget.draftId != null) {
+        // UPDATE existing draft
+        draftData['updatedAt'] = FieldValue.serverTimestamp();
+
+        await FirebaseFirestore.instance
+            .collection('found_item_reports')
+            .doc(widget.draftId)
+            .update(draftData);
+      } else {
+        // CREATE new draft
+        draftData['createdAt'] = FieldValue.serverTimestamp();
+
+        await FirebaseFirestore.instance
+            .collection('found_item_reports')
+            .add(draftData);
+      }
 
       if (!mounted) return;
 
@@ -826,11 +932,22 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Report Found Item'),
+        title: Text(_isDraftMode ? 'Edit Draft - Found Item' : 'Report Found Item'),
         backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
       ),
-      body: Stack(
+      body: _isLoadingDraft
+          ? const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading draft...'),
+          ],
+        ),
+      )
+          : Stack(
         children: [
           SingleChildScrollView(
             child: Padding(
