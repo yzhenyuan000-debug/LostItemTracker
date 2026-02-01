@@ -281,7 +281,7 @@ class _FoundItemReportingSuccessPageState
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  'Thank you for helping reunite lost items with their owners!',
+                                  'Thank you for helping reunite lost items with their owners! Your kindness makes a difference, please drop off any found items at the drop-off desk as soon as possible.',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: Colors.green.shade800,

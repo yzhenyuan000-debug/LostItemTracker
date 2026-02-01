@@ -427,6 +427,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
       'foundDateTime': foundDateTime.toIso8601String(),
       'dropOffDeskId': dropOffDeskId,
       'reportStatus': reportStatus,
+      'foundItemDropOffStatus': 'pending',
       'createdAt': DateTime.now().toIso8601String(), // Placeholder
     };
 
@@ -695,6 +696,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         'dropOffDeskId': _selectedDropOffDeskId!,
         'reportStatus': 'submitted',
         'itemReturnStatus': 'pending',
+        'foundItemDropOffStatus': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       };
 
@@ -733,6 +735,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
           'dropOffDeskId': _selectedDropOffDeskId!,
           'reportStatus': 'submitted', // Changed from 'draft' to 'submitted'
           'itemReturnStatus': 'pending',
+          'foundItemDropOffStatus': 'pending', // Auto-set on submit
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
@@ -871,6 +874,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         'foundDateTime': _foundDateTime != null ? Timestamp.fromDate(_foundDateTime!) : null,
         'dropOffDeskId': _selectedDropOffDeskId,
         'reportStatus': 'draft',
+        // Note: foundItemDropOffStatus is NOT set for drafts.
+        // It will be automatically set to 'pending' when the draft is submitted.
       };
 
       if (_isDraftMode && widget.draftId != null) {
