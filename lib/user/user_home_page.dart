@@ -7,6 +7,10 @@ import 'campus_map_page.dart';
 import 'user_profile_page.dart';
 import 'user_notification_page.dart';
 import 'report_history_page.dart';
+import 'lost_item_report.dart';
+import 'found_item_report.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -23,11 +27,21 @@ class _UserHomePageState extends State<UserHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _unreadNotificationCount = 0;
 
+  // Lightweight feed data (avoids holding full Firestore docs in memory)
+  List<_FeedItem>? _lostFeedItems;
+  List<_FeedItem>? _foundFeedItems;
+  bool _isLoadingLostFeed = true;
+  bool _isLoadingFoundFeed = true;
+  bool _lostFeedError = false;
+  bool _foundFeedError = false;
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _listenToNotifications();
+    _loadLostFeed();
+    _loadFoundFeed();
   }
 
   Future<void> _loadUserData() async {
@@ -103,6 +117,140 @@ class _UserHomePageState extends State<UserHomePage> {
     );
   }
 
+  Uint8List? _convertPhotoBytes(dynamic photoBytesData) {
+    if (photoBytesData == null) return null;
+    if (photoBytesData is Uint8List) return photoBytesData;
+    if (photoBytesData is List) {
+      return Uint8List.fromList(List<int>.from(photoBytesData));
+    }
+    return null;
+  }
+
+  // Compress image bytes down to a small thumbnail to avoid holding large blobs in memory
+  Future<Uint8List?> _createThumbnail(Uint8List? photoBytes) async {
+    if (photoBytes == null) return null;
+    try {
+      final ui.Codec codec = await ui.instantiateImageCodec(
+        photoBytes,
+        targetWidth: 160,
+        targetHeight: 160,
+      );
+      final ui.FrameInfo frameInfo = await codec.getNextFrame();
+      final ui.Image image = frameInfo.image;
+
+      const double targetSize = 160.0;
+      final double scale = targetSize /
+          (image.width > image.height ? image.width.toDouble() : image.height.toDouble());
+      final int newWidth = (image.width * scale).toInt();
+      final int newHeight = (image.height * scale).toInt();
+
+      final ui.PictureRecorder recorder = ui.PictureRecorder();
+      final Canvas canvas = Canvas(
+        recorder,
+        Rect.fromLTWH(0, 0, newWidth.toDouble(), newHeight.toDouble()),
+      );
+      canvas.drawImageRect(
+        image,
+        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+        Rect.fromLTWH(0, 0, newWidth.toDouble(), newHeight.toDouble()),
+        Paint(),
+      );
+
+      final ui.Picture picture = recorder.endRecording();
+      final ui.Image thumbnailImage = await picture.toImage(newWidth, newHeight);
+      final ByteData? byteData =
+      await thumbnailImage.toByteData(format: ui.ImageByteFormat.png);
+
+      image.dispose();
+      thumbnailImage.dispose();
+      codec.dispose();
+
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> _loadLostFeed() async {
+    if (mounted) setState(() { _isLoadingLostFeed = true; _lostFeedError = false; });
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('lost_item_reports')
+          .where('reportStatus', isEqualTo: 'submitted')
+          .orderBy('createdAt', descending: true)
+          .limit(8)
+          .get();
+
+      final items = <_FeedItem>[];
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final rawPhoto = _convertPhotoBytes(data['photoBytes']);
+        final thumbnail = await _createThumbnail(rawPhoto);
+        // rawPhoto goes out of scope here and becomes eligible for GC
+        items.add(_FeedItem(
+          reportId: doc.id,
+          itemName: data['itemName'] as String? ?? 'Untitled',
+          category: data['category'] as String? ?? '',
+          thumbnailBytes: thumbnail,
+        ));
+      }
+      // snapshot goes out of scope → full document data eligible for GC
+
+      if (mounted) {
+        setState(() {
+          _lostFeedItems = items;
+          _isLoadingLostFeed = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingLostFeed = false;
+          _lostFeedError = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadFoundFeed() async {
+    if (mounted) setState(() { _isLoadingFoundFeed = true; _foundFeedError = false; });
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('found_item_reports')
+          .where('reportStatus', isEqualTo: 'submitted')
+          .orderBy('createdAt', descending: true)
+          .limit(8)
+          .get();
+
+      final items = <_FeedItem>[];
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final rawPhoto = _convertPhotoBytes(data['photoBytes']);
+        final thumbnail = await _createThumbnail(rawPhoto);
+        items.add(_FeedItem(
+          reportId: doc.id,
+          itemName: data['itemName'] as String? ?? 'Untitled',
+          category: data['category'] as String? ?? '',
+          thumbnailBytes: thumbnail,
+        ));
+      }
+
+      if (mounted) {
+        setState(() {
+          _foundFeedItems = items;
+          _isLoadingFoundFeed = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingFoundFeed = false;
+          _foundFeedError = true;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,6 +299,8 @@ class _UserHomePageState extends State<UserHomePage> {
       body: RefreshIndicator(
         onRefresh: () async {
           await _loadUserData();
+          _loadLostFeed();
+          _loadFoundFeed();
           await Future.delayed(const Duration(seconds: 1));
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -324,57 +474,25 @@ class _UserHomePageState extends State<UserHomePage> {
 
                 const SizedBox(height: 30),
 
-                // Latest Lost or Found Item Feed
-                Text(
-                  'Latest Lost or Found Item Feed',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade800,
-                  ),
+                // ==================== LATEST LOST ITEM FEED ====================
+                _buildFeedSectionTitle(
+                  title: 'Latest Lost Item',
+                  icon: Icons.search_off,
+                  color: Colors.blue.shade600,
                 ),
+                const SizedBox(height: 12),
+                _buildLostItemFeed(),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 28),
 
-                // Placeholder for latest items feed
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(40),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.grey.shade300,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.feed_outlined,
-                        size: 64,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No Items Yet',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Latest lost and found items will appear here',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade500,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
+                // ==================== LATEST FOUND ITEM FEED ====================
+                _buildFeedSectionTitle(
+                  title: 'Latest Found Item',
+                  icon: Icons.inventory_2_outlined,
+                  color: Colors.orange.shade600,
                 ),
+                const SizedBox(height: 12),
+                _buildFoundItemFeed(),
 
                 const SizedBox(height: 20),
               ],
@@ -399,6 +517,357 @@ class _UserHomePageState extends State<UserHomePage> {
     );
   }
 
+  // ==================== FEED SECTION TITLE ====================
+  Widget _buildFeedSectionTitle({
+    required String title,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade800,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==================== LOST ITEM FEED ====================
+  Widget _buildLostItemFeed() {
+    if (_isLoadingLostFeed) {
+      return _buildFeedLoadingPlaceholder();
+    }
+    if (_lostFeedError) {
+      return _buildFeedErrorPlaceholder();
+    }
+    final items = _lostFeedItems ?? [];
+    if (items.isEmpty) {
+      return _buildFeedEmptyPlaceholder(
+        icon: Icons.search_off,
+        message: 'No lost item reports yet',
+        color: Colors.blue,
+      );
+    }
+    return SizedBox(
+      height: 220,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          return _buildFeedThumbnailCard(
+            feedItem: items[index],
+            reportType: 'lost',
+          );
+        },
+      ),
+    );
+  }
+
+  // ==================== FOUND ITEM FEED ====================
+  Widget _buildFoundItemFeed() {
+    if (_isLoadingFoundFeed) {
+      return _buildFeedLoadingPlaceholder();
+    }
+    if (_foundFeedError) {
+      return _buildFeedErrorPlaceholder();
+    }
+    final items = _foundFeedItems ?? [];
+    if (items.isEmpty) {
+      return _buildFeedEmptyPlaceholder(
+        icon: Icons.inventory_2_outlined,
+        message: 'No found item reports yet',
+        color: Colors.orange,
+      );
+    }
+    return SizedBox(
+      height: 220,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          return _buildFeedThumbnailCard(
+            feedItem: items[index],
+            reportType: 'found',
+          );
+        },
+      ),
+    );
+  }
+
+  // ==================== FEED THUMBNAIL CARD ====================
+  Widget _buildFeedThumbnailCard({
+    required _FeedItem feedItem,
+    required String reportType, // 'lost' or 'found'
+  }) {
+    final isLost = reportType == 'lost';
+    final Color accentColor = isLost ? Colors.blue.shade600 : Colors.orange.shade600;
+    final Color bgColor = isLost ? Colors.blue.shade50 : Colors.orange.shade50;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: InkWell(
+        onTap: () {
+          if (isLost) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LostItemReportPage(reportId: feedItem.reportId),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => FoundItemReportPage(reportId: feedItem.reportId),
+              ),
+            );
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 160,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade200,
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+            border: Border.all(
+              color: Colors.grey.shade200,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Thumbnail image
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+                child: SizedBox(
+                  width: 160,
+                  height: 120,
+                  child: feedItem.thumbnailBytes != null
+                      ? Image.memory(
+                    feedItem.thumbnailBytes!,
+                    fit: BoxFit.cover,
+                  )
+                      : Container(
+                    color: Colors.grey.shade100,
+                    child: Center(
+                      child: Icon(
+                        isLost ? Icons.search_off : Icons.inventory_2_outlined,
+                        size: 40,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Info
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Type badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: bgColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isLost ? 'Lost' : 'Found',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: accentColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // Item name
+                    Text(
+                      feedItem.itemName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // Category
+                    if (feedItem.category.isNotEmpty)
+                      Text(
+                        feedItem.category,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ==================== FEED PLACEHOLDER WIDGETS ====================
+  Widget _buildFeedLoadingPlaceholder() {
+    return SizedBox(
+      height: 200,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: 4,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Container(
+              width: 160,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                    ),
+                    child: Container(
+                      width: 160,
+                      height: 120,
+                      color: Colors.grey.shade200,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 14,
+                          color: Colors.grey.shade200,
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: 100,
+                          height: 14,
+                          color: Colors.grey.shade200,
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 70,
+                          height: 12,
+                          color: Colors.grey.shade200,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFeedErrorPlaceholder() {
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 40, color: Colors.red.shade400),
+            const SizedBox(height: 8),
+            Text(
+              'Failed to load items',
+              style: TextStyle(fontSize: 14, color: Colors.red.shade600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeedEmptyPlaceholder({
+    required IconData icon,
+    required String message,
+    required MaterialColor color,
+  }) {
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.shade200),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 48, color: color.shade300),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              style: TextStyle(fontSize: 14, color: color.shade600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== ACCOUNT DRAWER ====================
   Widget _buildAccountDrawer() {
     return Drawer(
       child: Container(
@@ -593,6 +1062,7 @@ class _UserHomePageState extends State<UserHomePage> {
     );
   }
 
+  // ==================== BOTTOM NAVIGATION ====================
   Widget _buildCustomBottomNav() {
     return BottomAppBar(
       shape: const CircularNotchedRectangle(),
@@ -740,6 +1210,7 @@ class _UserHomePageState extends State<UserHomePage> {
     );
   }
 
+  // ==================== ACTION CARDS ====================
   Widget _buildActionCard({
     required IconData icon,
     required String title,
@@ -780,4 +1251,19 @@ class _UserHomePageState extends State<UserHomePage> {
       ),
     );
   }
+}
+
+// Lightweight data holder for feed thumbnails — avoids keeping full Firestore documents in memory
+class _FeedItem {
+  final String reportId;
+  final String itemName;
+  final String category;
+  final Uint8List? thumbnailBytes; // Small compressed thumbnail only
+
+  _FeedItem({
+    required this.reportId,
+    required this.itemName,
+    required this.category,
+    this.thumbnailBytes,
+  });
 }
