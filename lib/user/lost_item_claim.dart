@@ -17,6 +17,7 @@ class _LostItemClaimPageState extends State<LostItemClaimPage> {
   bool _isLoading = true;
   Map<String, dynamic>? _claimData;
   Map<String, dynamic>? _foundItemData;
+  Map<String, dynamic>? _dropOffDeskData;
   bool _isOwner = false;
 
   @override
@@ -44,6 +45,7 @@ class _LostItemClaimPageState extends State<LostItemClaimPage> {
 
       // Load found item data
       Map<String, dynamic>? foundItemData;
+      Map<String, dynamic>? dropOffDeskData;
       final foundItemReportId = data['foundItemReportId'] as String?;
       if (foundItemReportId != null) {
         try {
@@ -54,6 +56,23 @@ class _LostItemClaimPageState extends State<LostItemClaimPage> {
 
           if (foundItemDoc.exists) {
             foundItemData = foundItemDoc.data() as Map<String, dynamic>;
+
+            // Load drop-off desk data
+            final dropOffDeskId = foundItemData['dropOffDeskId'] as String?;
+            if (dropOffDeskId != null) {
+              try {
+                final deskDoc = await FirebaseFirestore.instance
+                    .collection('dropOffDesks')
+                    .doc(dropOffDeskId)
+                    .get();
+
+                if (deskDoc.exists) {
+                  dropOffDeskData = deskDoc.data() as Map<String, dynamic>;
+                }
+              } catch (e) {
+                print('Error loading drop-off desk: $e');
+              }
+            }
           }
         } catch (e) {
           print('Error loading found item: $e');
@@ -63,6 +82,7 @@ class _LostItemClaimPageState extends State<LostItemClaimPage> {
       setState(() {
         _claimData = data;
         _foundItemData = foundItemData;
+        _dropOffDeskData = dropOffDeskData;
         _isOwner = currentUser?.uid == data['userId'];
         _isLoading = false;
       });
@@ -126,6 +146,13 @@ class _LostItemClaimPageState extends State<LostItemClaimPage> {
 
               // Claimed Item Card
               if (_foundItemData != null) _buildClaimedItemCard(),
+
+              const SizedBox(height: 24),
+
+              // Drop-off Desk Information
+              _buildSectionTitle('Drop-off Desk'),
+              const SizedBox(height: 12),
+              _buildDropOffDeskSection(),
 
               const SizedBox(height: 24),
 
@@ -532,6 +559,142 @@ class _LostItemClaimPageState extends State<LostItemClaimPage> {
               fontSize: 15,
               color: Colors.grey.shade800,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getDropOffDeskColor() {
+    if (_dropOffDeskData == null) return Colors.indigo.shade700;
+
+    try {
+      final colorHex = _dropOffDeskData!['colorHex'] as String? ?? '#3F51B5';
+      return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return Colors.indigo.shade700;
+    }
+  }
+
+  Widget _buildDropOffDeskSection() {
+    if (_dropOffDeskData == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: Colors.grey.shade600,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Drop-off desk information not available',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final deskColor = _getDropOffDeskColor();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: deskColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: deskColor.withOpacity(0.3),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: deskColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.store,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _dropOffDeskData!['name'] ?? 'Unknown Desk',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _dropOffDeskData!['description'] ?? '',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                Icons.access_time,
+                size: 16,
+                color: Colors.grey.shade600,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _dropOffDeskData!['operatingHours'] ?? 'N/A',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.phone,
+                size: 16,
+                color: Colors.grey.shade600,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _dropOffDeskData!['contact'] ?? 'N/A',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
           ),
         ],
       ),
