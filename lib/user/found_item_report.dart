@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'dart:typed_data';
+import 'lost_item_claiming_page.dart';
 
 class FoundItemReportPage extends StatefulWidget {
   final String reportId;
@@ -156,12 +157,15 @@ class _FoundItemReportPageState extends State<FoundItemReportPage> {
   }
 
   Future<void> _handleClaimThisItem() async {
-    // TODO: Implement the logic for when someone claims this item
-    // This could involve creating a claim request, sending a notification, etc.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Claim This Item feature coming soon!'),
-        duration: Duration(seconds: 2),
+    if (_reportData == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LostItemClaimingPage(
+          foundItemReportId: widget.reportId,
+          foundItemData: _reportData!,
+        ),
       ),
     );
   }
@@ -514,18 +518,21 @@ class _FoundItemReportPageState extends State<FoundItemReportPage> {
     final reportStatus = _reportData!['reportStatus'] as String? ?? 'submitted';
 
     Color statusColor;
+    Color statusTextColor;
     String statusText;
     IconData statusIcon;
 
     switch (itemReturnStatus) {
       case 'claimed':
         statusColor = Colors.green;
+        statusTextColor = Colors.green.shade700;
         statusText = 'Item Claimed';
         statusIcon = Icons.check_circle;
         break;
       case 'pending':
       default:
         statusColor = Colors.orange;
+        statusTextColor = Colors.orange.shade700;
         statusText = 'Pending';
         statusIcon = Icons.pending;
         break;
@@ -557,7 +564,7 @@ class _FoundItemReportPageState extends State<FoundItemReportPage> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: statusColor,
+                    color: statusTextColor,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -639,7 +646,6 @@ class _FoundItemReportPageState extends State<FoundItemReportPage> {
 
   Widget _buildInfoCard(List<Widget> children) {
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
