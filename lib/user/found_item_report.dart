@@ -179,13 +179,13 @@ class _FoundItemReportPageState extends State<FoundItemReportPage> {
   }
 
   Color _getDropOffDeskColor() {
-    if (_dropOffDeskData == null) return Colors.indigo.shade700;
+    if (_dropOffDeskData == null) return Colors.orange.shade700;
 
     try {
       final colorHex = _dropOffDeskData!['colorHex'] as String? ?? '#3F51B5';
       return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
     } catch (e) {
-      return Colors.indigo.shade700;
+      return Colors.orange.shade700;
     }
   }
 
@@ -194,7 +194,7 @@ class _FoundItemReportPageState extends State<FoundItemReportPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Found Item Report'),
-        backgroundColor: Colors.indigo.shade700,
+        backgroundColor: Colors.orange.shade700,
         foregroundColor: Colors.white,
       ),
       body: _isLoading
@@ -646,6 +646,7 @@ class _FoundItemReportPageState extends State<FoundItemReportPage> {
 
   Widget _buildInfoCard(List<Widget> children) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,

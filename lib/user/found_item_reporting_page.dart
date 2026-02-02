@@ -61,7 +61,7 @@ class DropOffDesk {
     try {
       return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
     } catch (e) {
-      return Colors.indigo.shade700;
+      return Colors.orange.shade700;
     }
   }
 }
@@ -248,7 +248,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
               ),
               const SizedBox(height: 20),
               ListTile(
-                leading: const Icon(Icons.photo_library, color: Colors.indigo),
+                leading: const Icon(Icons.photo_library, color: Colors.orange),
                 title: const Text('Choose from Gallery'),
                 onTap: () {
                   Navigator.pop(context);
@@ -256,7 +256,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.camera_alt, color: Colors.indigo),
+                leading: const Icon(Icons.camera_alt, color: Colors.orange),
                 title: const Text('Take a Photo'),
                 onTap: () {
                   Navigator.pop(context);
@@ -474,7 +474,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         return Theme(
           data: ThemeData.light().copyWith(
             colorScheme: ColorScheme.light(
-              primary: Colors.indigo.shade700,
+              primary: Colors.orange.shade700,
             ),
           ),
           child: child!,
@@ -490,7 +490,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
           return Theme(
             data: ThemeData.light().copyWith(
               colorScheme: ColorScheme.light(
-                primary: Colors.indigo.shade700,
+                primary: Colors.orange.shade700,
               ),
             ),
             child: child!,
@@ -593,7 +593,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo.shade700,
+                backgroundColor: Colors.orange.shade700,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Confirm'),
@@ -950,7 +950,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_isDraftMode ? 'Edit Draft - Found Item' : 'Report Found Item'),
-        backgroundColor: Colors.indigo.shade700,
+        backgroundColor: Colors.orange.shade700,
         foregroundColor: Colors.white,
       ),
       body: _isLoadingDraft
@@ -1004,12 +1004,12 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                     ),
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: Colors.indigo.shade50,
+                                        color: Colors.orange.shade50,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: _compressedImageBytes != null
-                                              ? Colors.indigo.shade50
-                                              : Colors.indigo.shade50,
+                                              ? Colors.orange.shade50
+                                              : Colors.orange.shade50,
                                           width: 2,
                                         ),
                                       ),
@@ -1042,7 +1042,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                             Icons.add_a_photo,
                                             size: 48,
                                             color:
-                                            Colors.indigo.shade700,
+                                            Colors.orange.shade700,
                                           ),
                                           const SizedBox(height: 12),
                                           Text(
@@ -1050,7 +1050,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                             style: TextStyle(
                                               fontSize: 14,
                                               color:
-                                              Colors.indigo.shade700,
+                                              Colors.orange.shade700,
                                             ),
                                           ),
                                           const SizedBox(height: 4),
@@ -1058,7 +1058,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                             '(Required)',
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.indigo.shade600,
+                                              color: Colors.orange.shade600,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
@@ -1089,6 +1089,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 16,
@@ -1136,6 +1138,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 16,
@@ -1172,6 +1176,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 16,
@@ -1209,10 +1215,10 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                   maxHeight: 180,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.indigo.shade50,
+                                  color: Colors.orange.shade50,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: Colors.indigo.shade50,
+                                    color: Colors.orange.shade50,
                                     width: 2,
                                   ),
                                 ),
@@ -1227,7 +1233,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                         Icon(
                                           Icons.location_on,
                                           size: 40,
-                                          color: Colors.indigo.shade700,
+                                          color: Colors.orange.shade700,
                                         ),
                                         const SizedBox(height: 6),
                                         Flexible(
@@ -1235,7 +1241,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                             _selectedAddress ?? 'Location selected',
                                             style: TextStyle(
                                               fontSize: 13,
-                                              color: Colors.indigo.shade800,
+                                              color: Colors.orange.shade800,
                                               fontWeight: FontWeight.w500,
                                             ),
                                             textAlign: TextAlign.center,
@@ -1250,7 +1256,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                                 'Lng: ${_longitude!.toStringAsFixed(5)}',
                                             style: TextStyle(
                                               fontSize: 11,
-                                              color: Colors.indigo.shade600,
+                                              color: Colors.orange.shade600,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -1298,14 +1304,14 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                     Icon(
                                       Icons.add_location,
                                       size: 48,
-                                      color: Colors.indigo.shade700,
+                                      color: Colors.orange.shade700,
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
                                       'Tap to select location',
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color: Colors.indigo.shade700,
+                                        color: Colors.orange.shade700,
                                       ),
                                     ),
                                   ],
@@ -1338,6 +1344,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 16,
@@ -1372,17 +1380,18 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                             decoration: BoxDecoration(
                               border: Border.all(
                                 color: _foundDateTime != null
-                                    ? Colors.indigo.shade700
+                                    ? Colors.orange.shade700
                                     : Colors.grey.shade400,
                               ),
                               borderRadius: BorderRadius.circular(12),
+                              color: Colors.grey.shade50,
                             ),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.calendar_today,
                                   color: _foundDateTime != null
-                                      ? Colors.indigo.shade700
+                                      ? Colors.orange.shade700
                                       : Colors.grey.shade600,
                                 ),
                                 const SizedBox(width: 12),
@@ -1572,7 +1581,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                               child: ElevatedButton(
                                 onPressed: _isSubmitting ? null : _submitReport,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo.shade700,
+                                  backgroundColor: Colors.orange.shade700,
                                   foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
@@ -1611,9 +1620,9 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                               child: OutlinedButton(
                                 onPressed: _isSubmitting ? null : _saveAsDraft,
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.indigo.shade700,
+                                  foregroundColor: Colors.orange.shade700,
                                   side: BorderSide(
-                                    color: Colors.indigo.shade700,
+                                    color: Colors.orange.shade700,
                                     width: 2,
                                   ),
                                   shape: RoundedRectangleBorder(
@@ -1628,7 +1637,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.indigo.shade700),
+                                        Colors.orange.shade700),
                                   ),
                                 )
                                     : const Text(

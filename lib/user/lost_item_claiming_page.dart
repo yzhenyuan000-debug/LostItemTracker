@@ -158,7 +158,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
               ),
               const SizedBox(height: 20),
               ListTile(
-                leading: const Icon(Icons.photo_library, color: Colors.indigo),
+                leading: const Icon(Icons.photo_library, color: Colors.deepPurple),
                 title: const Text('Choose from Gallery'),
                 onTap: () {
                   Navigator.pop(context);
@@ -166,7 +166,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.camera_alt, color: Colors.indigo),
+                leading: const Icon(Icons.camera_alt, color: Colors.deepPurple),
                 title: const Text('Take a Photo'),
                 onTap: () {
                   Navigator.pop(context);
@@ -368,7 +368,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo.shade700,
+                backgroundColor: Colors.deepPurple.shade700,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Submit'),
@@ -453,7 +453,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Claim Lost Item'),
-        backgroundColor: Colors.indigo.shade700,
+        backgroundColor: Colors.deepPurple.shade700,
         foregroundColor: Colors.white,
       ),
       body: Stack(
@@ -607,7 +607,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
             children: [
               Icon(
                 Icons.store,
-                color: Colors.indigo.shade700,
+                color: Colors.blue.shade700,
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -616,7 +616,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.indigo.shade700,
+                  color: Colors.blue.shade700,
                 ),
               ),
             ],
@@ -633,7 +633,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.indigo.shade700),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.deepPurple.shade700),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -782,7 +782,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
               children: [
                 Icon(
                   Icons.calendar_today,
-                  color: Colors.indigo.shade700,
+                  color: Colors.deepPurple.shade700,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -829,12 +829,12 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                   maxHeight: 180,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.indigo.shade50,
+                  color: Colors.deepPurple.shade50,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: _latitude != null && _longitude != null
-                        ? Colors.indigo.shade50
-                        : Colors.indigo.shade50,
+                        ? Colors.deepPurple.shade50
+                        : Colors.deepPurple.shade50,
                     width: 2,
                   ),
                 ),
@@ -849,7 +849,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                         Icon(
                           Icons.location_on,
                           size: 40,
-                          color: Colors.indigo.shade700,
+                          color: Colors.deepPurple.shade700,
                         ),
                         const SizedBox(height: 6),
                         Flexible(
@@ -857,7 +857,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                             _selectedAddress ?? 'Location selected',
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.indigo.shade800,
+                              color: Colors.deepPurple.shade800,
                               fontWeight: FontWeight.w500,
                             ),
                             textAlign: TextAlign.center,
@@ -872,7 +872,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                                 'Lng: ${_longitude!.toStringAsFixed(5)}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.indigo.shade600,
+                              color: Colors.deepPurple.shade600,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -920,14 +920,14 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                     Icon(
                       Icons.add_location,
                       size: 48,
-                      color: Colors.indigo.shade700,
+                      color: Colors.deepPurple.shade700,
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'Tap to select location',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.indigo.shade700,
+                        color: Colors.deepPurple.shade700,
                       ),
                     ),
                   ],
@@ -1020,10 +1020,10 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                     ),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.indigo.shade50,
+                        color: Colors.deepPurple.shade50,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.indigo.shade50,
+                          color: Colors.deepPurple.shade50,
                           width: 2,
                         ),
                       ),
@@ -1053,14 +1053,14 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                           Icon(
                             Icons.add_a_photo,
                             size: 48,
-                            color: Colors.indigo.shade700,
+                            color: Colors.deepPurple.shade700,
                           ),
                           const SizedBox(height: 12),
                           Text(
                             'Tap to upload photo',
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.indigo.shade700,
+                              color: Colors.deepPurple.shade700,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -1068,7 +1068,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                             '(Optional)',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.indigo.shade500,
+                              color: Colors.deepPurple.shade500,
                             ),
                           ),
                         ],
@@ -1287,7 +1287,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                         children: [
                           Icon(
                             Icons.calendar_today,
-                            color: Colors.indigo.shade700,
+                            color: Colors.deepPurple.shade700,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -1336,7 +1336,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
                         children: [
                           Icon(
                             Icons.access_time,
-                            color: Colors.indigo.shade700,
+                            color: Colors.deepPurple.shade700,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -1384,7 +1384,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
               _confirmationChecked = value ?? false;
             });
           },
-          activeColor: Colors.indigo.shade700,
+          activeColor: Colors.deepPurple.shade700,
         ),
         Expanded(
           child: GestureDetector(
@@ -1396,11 +1396,12 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Text(
-                'I confirm that this item belongs to me and the information provided is accurate',
+                'I confirm that this item belongs to me and the information provided is accurate. I understand that making a false claim may result in account suspension and that the school may take further disciplinary or legal action.',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey.shade700,
+                  color: Colors.deepOrange.shade700,
                 ),
+                textAlign: TextAlign.justify,
               ),
             ),
           ),
@@ -1416,7 +1417,7 @@ class _LostItemClaimingPageState extends State<LostItemClaimingPage> {
       child: ElevatedButton(
         onPressed: _isSubmitting ? null : _submitClaim,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.indigo.shade700,
+          backgroundColor: Colors.deepPurple.shade700,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

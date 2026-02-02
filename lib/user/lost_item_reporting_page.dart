@@ -972,6 +972,8 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 16,
@@ -1019,6 +1021,8 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 16,
@@ -1055,6 +1059,8 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 16,
@@ -1223,6 +1229,8 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 16,
@@ -1261,6 +1269,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
                                     : Colors.grey.shade400,
                               ),
                               borderRadius: BorderRadius.circular(12),
+                              color: Colors.grey.shade50,
                             ),
                             child: Row(
                               children: [
