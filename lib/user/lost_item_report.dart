@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'dart:typed_data';
+import 'found_item_reporting_page.dart';
 
 class LostItemReportPage extends StatefulWidget {
   final String reportId;
@@ -136,12 +137,10 @@ class _LostItemReportPageState extends State<LostItemReportPage> {
   }
 
   Future<void> _handleFoundThisItem() async {
-    // TODO: Implement the logic for when someone found this item
-    // This could involve creating a match, sending a notification, etc.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Found This Item feature coming soon!'),
-        duration: Duration(seconds: 2),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const FoundItemReportingPage(),
       ),
     );
   }
