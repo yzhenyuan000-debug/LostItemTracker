@@ -11,6 +11,7 @@ import 'lost_item_report.dart';
 import 'found_item_report.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'search_and_filter_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -416,16 +417,10 @@ class _UserHomePageState extends State<UserHomePage> {
                         title: 'Find Item',
                         color: Colors.green.shade400,
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Find Item feature coming soon'),
-                              behavior: SnackBarBehavior.floating,
-                              margin: EdgeInsets.only(
-                                left: 16,
-                                right: 16,
-                                bottom: 1,
-                              ),
-                              duration: Duration(seconds: 2),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SearchAndFilterPage(),
                             ),
                           );
                         },
@@ -1099,17 +1094,12 @@ class _UserHomePageState extends State<UserHomePage> {
         if (index == 4) {
           // Open account drawer
           _scaffoldKey.currentState?.openEndDrawer();
-        } else if (index != 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Navigation to $label coming soon'),
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.only(
-                left: 16,
-                right: 16,
-                bottom: 1,
-              ),
-              duration: const Duration(seconds: 2),
+        } else if (index == 1) {
+          // Navigate to Search & Filter page
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SearchAndFilterPage(),
             ),
           );
         }
