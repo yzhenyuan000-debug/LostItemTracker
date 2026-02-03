@@ -115,7 +115,7 @@ class _LostItemClaimPageState extends State<LostItemClaimPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Claim Details'),
-        backgroundColor: Colors.indigo.shade700,
+        backgroundColor: Colors.deepPurple.shade700,
         foregroundColor: Colors.white,
       ),
       body: _isLoading
@@ -566,13 +566,13 @@ class _LostItemClaimPageState extends State<LostItemClaimPage> {
   }
 
   Color _getDropOffDeskColor() {
-    if (_dropOffDeskData == null) return Colors.indigo.shade700;
+    if (_dropOffDeskData == null) return Colors.deepPurple.shade700;
 
     try {
       final colorHex = _dropOffDeskData!['colorHex'] as String? ?? '#3F51B5';
       return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
     } catch (e) {
-      return Colors.indigo.shade700;
+      return Colors.deepPurple.shade700;
     }
   }
 
