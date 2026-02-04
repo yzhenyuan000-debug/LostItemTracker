@@ -311,6 +311,31 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
     return compressed;
   }
 
+  /// Create thumbnail for list/grid display (small, fixed size)
+  /// Size: 80x80 pixels, quality: 70
+  Future<Uint8List?> _createThumbnailBytes(Uint8List photoBytes) async {
+    try {
+      final img.Image? decoded = img.decodeImage(photoBytes);
+      if (decoded == null) return null;
+
+      // Create small thumbnail (80x80)
+      final thumbnail = img.copyResize(
+        decoded,
+        width: 80,
+        height: 80,
+        interpolation: img.Interpolation.average,
+      );
+
+      // Compress with moderate quality
+      final compressed = img.encodeJpg(thumbnail, quality: 70);
+
+      return Uint8List.fromList(compressed);
+    } catch (e) {
+      print('Error creating thumbnail: $e');
+      return null;
+    }
+  }
+
   /// Calculate the size of all non-image fields in bytes
   /// This helps us determine how much space is available for the image
   int _calculateOtherFieldsSize({
@@ -534,7 +559,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
 
       print('Allowed for image: $allowedForImage bytes');
 
-      // Step 3: Validate that we have enough space for an image
+      // Step 3: Validate that we have enough space for an image (if provided)
       if (_compressedImageBytes != null && allowedForImage < MIN_IMAGE_BYTES) {
         throw Exception(
             'Document size exceeded. The text fields are too large to include an image. '
@@ -542,8 +567,10 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         );
       }
 
-      // Step 4: Compress image if needed
+      // Step 4: Compress image if needed and create thumbnail
       Uint8List? finalImageBytes;
+      Uint8List? thumbnailBytes;
+
       if (_compressedImageBytes != null) {
         final currentImageSize = _compressedImageBytes!.lengthInBytes;
         print('Current image size: $currentImageSize bytes');
@@ -572,6 +599,13 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
             );
           }
         }
+
+        // Create thumbnail for list display
+        print('Creating thumbnail...');
+        thumbnailBytes = await _createThumbnailBytes(finalImageBytes!); // Use ! to assert non-null
+        if (thumbnailBytes != null) {
+          print('Thumbnail created: ${thumbnailBytes.lengthInBytes} bytes');
+        }
       }
 
       // Step 5: Prepare data for Firestore
@@ -580,7 +614,8 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         'category': _selectedCategory!,
         'itemName': _itemNameController.text.trim(),
         'itemDescription': _descriptionController.text.trim(),
-        'photoBytes': finalImageBytes, // Using compressed Uint8List
+        'photoBytes': finalImageBytes, // Full size image (compressed)
+        'thumbnailBytes': thumbnailBytes, // Small thumbnail for lists
         'latitude': _latitude!,
         'longitude': _longitude!,
         'locationRadius': _locationRadius ?? 50.0,
@@ -595,6 +630,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
       // Step 6: Final size validation (for debugging)
       final estimatedTotalSize = otherFieldsBytes +
           (finalImageBytes?.lengthInBytes ?? 0) +
+          (thumbnailBytes?.lengthInBytes ?? 0) +
           OVERHEAD_RESERVE_BYTES;
       print('Estimated total document size: $estimatedTotalSize bytes');
 
@@ -618,6 +654,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
           'itemName': _itemNameController.text.trim(),
           'itemDescription': _descriptionController.text.trim(),
           'photoBytes': finalImageBytes,
+          'thumbnailBytes': thumbnailBytes,
           'latitude': _latitude!,
           'longitude': _longitude!,
           'locationRadius': _locationRadius ?? 50.0,
@@ -699,6 +736,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
       // For drafts, we apply the same smart compression logic
       // but we're more lenient about incomplete data
       Uint8List? finalImageBytes;
+      Uint8List? thumbnailBytes;
 
       if (_compressedImageBytes != null &&
           _selectedCategory != null &&
@@ -734,9 +772,15 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
               maxBytes: allowedForImage,
             );
           }
+
+          // Create thumbnail for draft
+          if (finalImageBytes != null) {
+            thumbnailBytes = await _createThumbnailBytes(finalImageBytes!); // Use ! to assert non-null
+          }
         } else {
           // Skip image if not enough space
           finalImageBytes = null;
+          thumbnailBytes = null;
           print('Not enough space for image in draft, skipping image');
         }
       } else {
@@ -744,6 +788,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         if (_compressedImageBytes != null &&
             _compressedImageBytes!.lengthInBytes < 900000) {
           finalImageBytes = _compressedImageBytes;
+          thumbnailBytes = await _createThumbnailBytes(finalImageBytes!);
         }
       }
 
@@ -754,6 +799,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         'itemName': _itemNameController.text.trim(),
         'itemDescription': _descriptionController.text.trim(),
         'photoBytes': finalImageBytes,
+        'thumbnailBytes': thumbnailBytes,
         'latitude': _latitude,
         'longitude': _longitude,
         'locationRadius': _locationRadius,

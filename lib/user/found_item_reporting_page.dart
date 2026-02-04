@@ -12,7 +12,6 @@ import 'user_home_page.dart';
 import 'item_matching_service.dart';
 
 // ==================== FIRESTORE SIZE CONSTANTS ====================
-// These constants ensure we stay within Firestore document size limits
 const int FIRESTORE_DOC_LIMIT_BYTES = 1048576;  // 1 MiB
 const int SAFE_DOC_BYTES = 1000000;              // Safe threshold
 const int OVERHEAD_RESERVE_BYTES = 20000;        // Reserve for Firestore overhead
@@ -67,7 +66,7 @@ class DropOffDesk {
 }
 
 class FoundItemReportingPage extends StatefulWidget {
-  final String? draftId; // Add draftId parameter for editing drafts
+  final String? draftId;
 
   const FoundItemReportingPage({super.key, this.draftId});
 
@@ -92,12 +91,10 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
   bool _isCompressingImage = false;
   bool _isSubmitting = false;
 
-  // Drop-off desk selection
   String? _selectedDropOffDeskId;
   List<DropOffDesk> _dropOffDesks = [];
   bool _isLoadingDesks = true;
 
-  // Draft editing support
   bool _isDraftMode = false;
   bool _isLoadingDraft = false;
 
@@ -155,7 +152,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         _itemNameController.text = data['itemName'] as String? ?? '';
         _descriptionController.text = data['itemDescription'] as String? ?? '';
 
-        // Convert photoBytes from List<dynamic> to Uint8List
         final photoBytesData = data['photoBytes'];
         if (photoBytesData != null) {
           if (photoBytesData is Uint8List) {
@@ -291,8 +287,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         });
 
         final bytes = await pickedFile.readAsBytes();
-
-        // Initial compression for preview (not final)
         final compressed = await _compressImageInitial(bytes);
 
         if (mounted) {
@@ -317,33 +311,25 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
     }
   }
 
-  /// Initial compression for image preview (moderate quality)
-  /// Final compression will be done during submission based on document size
   Future<Uint8List> _compressImageInitial(Uint8List bytes) async {
     final img.Image? decoded = img.decodeImage(bytes);
     if (decoded == null) return bytes;
 
     img.Image image = decoded;
-
-    // Moderate initial compression for preview
     int quality = 85;
-    Uint8List compressed =
-    Uint8List.fromList(img.encodeJpg(image, quality: quality));
-
-    const int maxSizeBytes = 800000; // 800KB for preview
+    Uint8List compressed = Uint8List.fromList(img.encodeJpg(image, quality: quality));
+    const int maxSizeBytes = 800000;
 
     while (compressed.length > maxSizeBytes && quality > 30) {
       quality -= 10;
-      compressed =
-          Uint8List.fromList(img.encodeJpg(image, quality: quality));
+      compressed = Uint8List.fromList(img.encodeJpg(image, quality: quality));
     }
 
     if (compressed.length > maxSizeBytes) {
       int targetWidth = 1200;
       while (compressed.length > maxSizeBytes && targetWidth > 400) {
         image = img.copyResize(image, width: targetWidth);
-        compressed =
-            Uint8List.fromList(img.encodeJpg(image, quality: 75));
+        compressed = Uint8List.fromList(img.encodeJpg(image, quality: 75));
         targetWidth -= 100;
       }
     }
@@ -351,38 +337,26 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
     return compressed;
   }
 
-  /// Smart compression to fit within Firestore document size limits
-  /// This function compresses the image to a specific max size in bytes
-  Future<Uint8List> _compressImageToMax(
-      Uint8List bytes, {
-        required int maxBytes,
-      }) async {
+  Future<Uint8List> _compressImageToMax(Uint8List bytes, {required int maxBytes}) async {
     final img.Image? decoded = img.decodeImage(bytes);
     if (decoded == null) return bytes;
 
     img.Image image = decoded;
-
-    // Phase 1: Reduce quality from 90 to 10
     int quality = 90;
-    Uint8List compressed =
-    Uint8List.fromList(img.encodeJpg(image, quality: quality));
+    Uint8List compressed = Uint8List.fromList(img.encodeJpg(image, quality: quality));
 
     while (compressed.lengthInBytes > maxBytes && quality > 10) {
       quality -= 10;
-      compressed =
-          Uint8List.fromList(img.encodeJpg(image, quality: quality));
+      compressed = Uint8List.fromList(img.encodeJpg(image, quality: quality));
     }
 
-    // Phase 2: If still too large, reduce dimensions by 80% iteratively
     int targetWidth = image.width;
     while (compressed.lengthInBytes > maxBytes && targetWidth > 200) {
       targetWidth = (targetWidth * 0.8).round();
       final resized = img.copyResize(image, width: targetWidth);
 
-      // Try to compress the resized image
       int q = 80;
-      Uint8List comp =
-      Uint8List.fromList(img.encodeJpg(resized, quality: q));
+      Uint8List comp = Uint8List.fromList(img.encodeJpg(resized, quality: q));
 
       while (comp.lengthInBytes > maxBytes && q > 10) {
         q -= 10;
@@ -396,8 +370,29 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
     return compressed;
   }
 
-  /// Calculate the size of all non-image fields in bytes
-  /// This helps us determine how much space is available for the image
+  /// Create thumbnail for list/grid display (small, fixed size)
+  /// Size: 80x80 pixels, quality: 70
+  Future<Uint8List?> _createThumbnailBytes(Uint8List photoBytes) async {
+    try {
+      final img.Image? decoded = img.decodeImage(photoBytes);
+      if (decoded == null) return null;
+
+      final thumbnail = img.copyResize(
+        decoded,
+        width: 80,
+        height: 80,
+        interpolation: img.Interpolation.average,
+      );
+
+      final compressed = img.encodeJpg(thumbnail, quality: 70);
+
+      return Uint8List.fromList(compressed);
+    } catch (e) {
+      print('Error creating thumbnail: $e');
+      return null;
+    }
+  }
+
   int _calculateOtherFieldsSize({
     required String userId,
     required String category,
@@ -413,7 +408,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
     required String reportStatus,
     String? itemReturnStatus,
   }) {
-    // Create a map with all non-image fields
     final otherFields = {
       'userId': userId,
       'category': category,
@@ -428,14 +422,13 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
       'dropOffDeskId': dropOffDeskId,
       'reportStatus': reportStatus,
       'foundItemDropOffStatus': 'pending',
-      'createdAt': DateTime.now().toIso8601String(), // Placeholder
+      'createdAt': DateTime.now().toIso8601String(),
     };
 
     if (itemReturnStatus != null) {
       otherFields['itemReturnStatus'] = itemReturnStatus;
     }
 
-    // Convert to JSON and encode to UTF-8 to get byte size
     final jsonString = jsonEncode(otherFields);
     final bytes = utf8.encode(jsonString);
 
@@ -575,7 +568,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
       return;
     }
 
-    // Show confirmation dialog
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -612,14 +604,11 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
     });
 
     try {
-      // Get current user ID
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         throw Exception('User not authenticated');
       }
 
-      // ==================== SMART IMAGE COMPRESSION ====================
-      // Step 1: Calculate the size of all non-image fields
       final otherFieldsBytes = _calculateOtherFieldsSize(
         userId: user.uid,
         category: _selectedCategory!,
@@ -638,12 +627,9 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
 
       print('Other fields size: $otherFieldsBytes bytes');
 
-      // Step 2: Calculate maximum allowed bytes for image
       final allowedForImage = SAFE_DOC_BYTES - otherFieldsBytes - OVERHEAD_RESERVE_BYTES;
-
       print('Allowed for image: $allowedForImage bytes');
 
-      // Step 3: Validate that we have enough space for an image
       if (allowedForImage < MIN_IMAGE_BYTES) {
         throw Exception(
             'Document size exceeded. The text fields are too large to include an image. '
@@ -651,19 +637,17 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         );
       }
 
-      // Step 4: Compress image if needed
+      // Compress image and create thumbnail
+      // Note: For Found Item, image is REQUIRED, so finalImageBytes is non-nullable
       Uint8List finalImageBytes;
       final currentImageSize = _compressedImageBytes!.lengthInBytes;
       print('Current image size: $currentImageSize bytes');
 
       if (currentImageSize <= allowedForImage) {
-        // Image is already within limits
         finalImageBytes = _compressedImageBytes!;
         print('Image within limits, no further compression needed');
       } else {
-        // Need to compress image to fit
         print('Compressing image to fit within $allowedForImage bytes...');
-
         finalImageBytes = await _compressImageToMax(
           _compressedImageBytes!,
           maxBytes: allowedForImage,
@@ -672,7 +656,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         final compressedSize = finalImageBytes.lengthInBytes;
         print('Image compressed to $compressedSize bytes');
 
-        // Verify compression was successful
         if (compressedSize > allowedForImage) {
           throw Exception(
               'Unable to compress image sufficiently. Please try a different photo.'
@@ -680,13 +663,20 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         }
       }
 
-      // Step 5: Prepare data for Firestore
+      // Create thumbnail for list display
+      print('Creating thumbnail...');
+      final thumbnailBytes = await _createThumbnailBytes(finalImageBytes);
+      if (thumbnailBytes != null) {
+        print('Thumbnail created: ${thumbnailBytes.lengthInBytes} bytes');
+      }
+
       final reportData = {
         'userId': user.uid,
         'category': _selectedCategory!,
         'itemName': _itemNameController.text.trim(),
         'itemDescription': _descriptionController.text.trim(),
-        'photoBytes': finalImageBytes, // Using compressed Uint8List
+        'photoBytes': finalImageBytes,
+        'thumbnailBytes': thumbnailBytes,
         'latitude': _latitude!,
         'longitude': _longitude!,
         'locationRadius': _locationRadius ?? 50.0,
@@ -700,9 +690,9 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Step 6: Final size validation (for debugging)
       final estimatedTotalSize = otherFieldsBytes +
           finalImageBytes.lengthInBytes +
+          (thumbnailBytes?.lengthInBytes ?? 0) +
           OVERHEAD_RESERVE_BYTES;
       print('Estimated total document size: $estimatedTotalSize bytes');
 
@@ -713,11 +703,9 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         );
       }
 
-      // Step 7: Add or Update Firestore
       String reportId;
 
       if (_isDraftMode && widget.draftId != null) {
-        // UPDATE existing draft
         await FirebaseFirestore.instance
             .collection('found_item_reports')
             .doc(widget.draftId)
@@ -726,6 +714,7 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
           'itemName': _itemNameController.text.trim(),
           'itemDescription': _descriptionController.text.trim(),
           'photoBytes': finalImageBytes,
+          'thumbnailBytes': thumbnailBytes,
           'latitude': _latitude!,
           'longitude': _longitude!,
           'locationRadius': _locationRadius ?? 50.0,
@@ -733,16 +722,15 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
           'locationDescription': _locationDescriptionController.text.trim(),
           'foundDateTime': Timestamp.fromDate(_foundDateTime!),
           'dropOffDeskId': _selectedDropOffDeskId!,
-          'reportStatus': 'submitted', // Changed from 'draft' to 'submitted'
+          'reportStatus': 'submitted',
           'itemReturnStatus': 'pending',
-          'foundItemDropOffStatus': 'pending', // Auto-set on submit
+          'foundItemDropOffStatus': 'pending',
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
         reportId = widget.draftId!;
         print('Draft updated and submitted with ID: $reportId');
       } else {
-        // CREATE new report
         final docRef = await FirebaseFirestore.instance
             .collection('found_item_reports')
             .add(reportData);
@@ -766,7 +754,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         _isSubmitting = false;
       });
 
-      // Navigate to success page with reportId
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (context) => FoundItemReportingSuccessPage(
@@ -800,15 +787,13 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
     });
 
     try {
-      // Get current user ID
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         throw Exception('User not authenticated');
       }
 
-      // For drafts, we apply the same smart compression logic
-      // but we're more lenient about incomplete data
       Uint8List? finalImageBytes;
+      Uint8List? thumbnailBytes;
 
       if (_compressedImageBytes != null &&
           _selectedCategory != null &&
@@ -817,7 +802,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
           _foundDateTime != null &&
           _selectedDropOffDeskId != null) {
 
-        // Calculate sizes for draft
         final otherFieldsBytes = _calculateOtherFieldsSize(
           userId: user.uid,
           category: _selectedCategory!,
@@ -846,26 +830,29 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
               maxBytes: allowedForImage,
             );
           }
+
+          // Create thumbnail for draft
+          thumbnailBytes = await _createThumbnailBytes(finalImageBytes!);
         } else {
-          // Skip image if not enough space
           finalImageBytes = null;
+          thumbnailBytes = null;
           print('Not enough space for image in draft, skipping image');
         }
       } else {
-        // Incomplete draft, just save the image as-is (or skip if too large)
         if (_compressedImageBytes != null &&
             _compressedImageBytes!.lengthInBytes < 900000) {
           finalImageBytes = _compressedImageBytes;
+          thumbnailBytes = await _createThumbnailBytes(finalImageBytes!);
         }
       }
 
-      // Prepare data for Firestore
       final draftData = {
         'userId': user.uid,
         'category': _selectedCategory,
         'itemName': _itemNameController.text.trim(),
         'itemDescription': _descriptionController.text.trim(),
         'photoBytes': finalImageBytes,
+        'thumbnailBytes': thumbnailBytes,
         'latitude': _latitude,
         'longitude': _longitude,
         'locationRadius': _locationRadius,
@@ -874,12 +861,9 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         'foundDateTime': _foundDateTime != null ? Timestamp.fromDate(_foundDateTime!) : null,
         'dropOffDeskId': _selectedDropOffDeskId,
         'reportStatus': 'draft',
-        // Note: foundItemDropOffStatus is NOT set for drafts.
-        // It will be automatically set to 'pending' when the draft is submitted.
       };
 
       if (_isDraftMode && widget.draftId != null) {
-        // UPDATE existing draft
         draftData['updatedAt'] = FieldValue.serverTimestamp();
 
         await FirebaseFirestore.instance
@@ -887,7 +871,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
             .doc(widget.draftId)
             .update(draftData);
       } else {
-        // CREATE new draft
         draftData['createdAt'] = FieldValue.serverTimestamp();
 
         await FirebaseFirestore.instance
@@ -901,7 +884,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         _isSubmitting = false;
       });
 
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Report saved as draft successfully'),
@@ -910,7 +892,6 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         ),
       );
 
-      // Navigate to home page
       await Future.delayed(const Duration(milliseconds: 500));
 
       if (!mounted) return;
@@ -969,349 +950,557 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
           SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Photos',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Photos',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: _isCompressingImage ? null : _pickImage,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        constraints: BoxConstraints(
+                          minHeight: 200,
+                          maxHeight: _compressedImageBytes != null
+                              ? MediaQuery.of(context).size.height * 0.5
+                              : 200,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.orange.shade50,
+                            width: 2,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Center(
-                          child: FractionallySizedBox(
-                            widthFactor: 1.0,
-                            child: InkWell(
-                              onTap: _isCompressingImage ? null : _pickImage,
-                              borderRadius: BorderRadius.circular(12),
-                              child: LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final maxHeight =
-                                      MediaQuery.of(context).size.height * 0.5;
-
-                                  return ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      maxHeight: maxHeight,
-                                      maxWidth: constraints.maxWidth,
-                                    ),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange.shade50,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: _compressedImageBytes != null
-                                              ? Colors.orange.shade50
-                                              : Colors.orange.shade50,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: _isCompressingImage
-                                          ? const Center(
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            CircularProgressIndicator(),
-                                            SizedBox(height: 12),
-                                            Text('Compressing image...'),
-                                          ],
-                                        ),
-                                      )
-                                          : _compressedImageBytes != null
-                                          ? ClipRRect(
-                                        borderRadius:
-                                        BorderRadius.circular(12),
-                                        child: Image.memory(
-                                          _compressedImageBytes!,
-                                          fit: BoxFit.contain,
-                                          width: double.infinity,
-                                        ),
-                                      )
-                                          : Column(
-                                        mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.add_a_photo,
-                                            size: 48,
-                                            color:
-                                            Colors.orange.shade700,
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Text(
-                                            'Tap to upload photo',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color:
-                                              Colors.orange.shade700,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '(Required)',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.orange.shade600,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
+                        child: _isCompressingImage
+                            ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 12),
+                              Text('Compressing image...'),
+                            ],
+                          ),
+                        )
+                            : _compressedImageBytes != null
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(
+                            _compressedImageBytes!,
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                          ),
+                        )
+                            : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_a_photo,
+                                size: 48,
+                                color: Colors.orange.shade700,
                               ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        Text(
-                          'Item Category',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          value: _selectedCategory,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                          hint: const Text('Select a category'),
-                          items: _categories.map((category) {
-                            return DropdownMenuItem(
-                              value: category,
-                              child: Text(category),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedCategory = value;
-                            });
-                          },
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please select a category';
-                            }
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        Text(
-                          'Item Name',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _itemNameController,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. Black iPhone 13',
-                            hintStyle: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: 14,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter the item name';
-                            }
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        Text(
-                          'Detailed Description',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _descriptionController,
-                          maxLines: 5,
-                          decoration: InputDecoration(
-                            hintText: 'Describe the item in detail (color, brand, special marks, etc.)',
-                            hintStyle: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: 14,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter a detailed description';
-                            }
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        Text(
-                          'Where did you find it?',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        Center(
-                          child: FractionallySizedBox(
-                            widthFactor: 1.0,
-                            child: InkWell(
-                              onTap: _selectLocation,
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                constraints: const BoxConstraints(
-                                  minHeight: 120,
-                                  maxHeight: 180,
+                              const SizedBox(height: 12),
+                              Text(
+                                'Tap to upload photo',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.orange.shade700,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade50,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.orange.shade50,
-                                    width: 2,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '(Required)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange.shade600,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Item Category',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _selectedCategory,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                      hint: const Text('Select a category'),
+                      items: _categories.map((category) {
+                        return DropdownMenuItem(
+                          value: category,
+                          child: Text(category),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCategory = value;
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select a category';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Item Name',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _itemNameController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Black iPhone 13',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter the item name';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Detailed Description',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _descriptionController,
+                      maxLines: 5,
+                      decoration: InputDecoration(
+                        hintText: 'Describe the item in detail (color, brand, special marks, etc.)',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter a detailed description';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Where did you find it?',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: _selectLocation,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        constraints: const BoxConstraints(
+                          minHeight: 120,
+                          maxHeight: 180,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.orange.shade50,
+                            width: 2,
+                          ),
+                        ),
+                        child: _latitude != null && _longitude != null
+                            ? Center(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 40,
+                                  color: Colors.orange.shade700,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _selectedAddress ?? 'Location selected',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.orange.shade800,
+                                    fontWeight: FontWeight.w500,
                                   ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                child: _latitude != null && _longitude != null
-                                    ? Center(
-                                  child: SingleChildScrollView(
-                                    padding: const EdgeInsets.all(12.0),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Lat: ${_latitude!.toStringAsFixed(5)}, '
+                                      'Lng: ${_longitude!.toStringAsFixed(5)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange.shade600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (_locationRadius != null) ...[
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          Icons.location_on,
-                                          size: 40,
-                                          color: Colors.orange.shade700,
+                                          Icons.radio_button_unchecked,
+                                          size: 12,
+                                          color: Colors.red.shade700,
                                         ),
-                                        const SizedBox(height: 6),
-                                        Flexible(
-                                          child: Text(
-                                            _selectedAddress ?? 'Location selected',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.orange.shade800,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Range: ${_formatRadius(_locationRadius!)}',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.red.shade700,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Flexible(
-                                          child: Text(
-                                            'Lat: ${_latitude!.toStringAsFixed(5)}, '
-                                                'Lng: ${_longitude!.toStringAsFixed(5)}',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.orange.shade600,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        if (_locationRadius != null) ...[
-                                          const SizedBox(height: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 3,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.red.shade50,
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  Icons.radio_button_unchecked,
-                                                  size: 12,
-                                                  color: Colors.red.shade700,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  'Range: ${_formatRadius(_locationRadius!)}',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: Colors.red.shade700,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
                                       ],
                                     ),
                                   ),
-                                )
-                                    : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                ],
+                              ],
+                            ),
+                          ),
+                        )
+                            : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_location,
+                                size: 48,
+                                color: Colors.orange.shade700,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Tap to select location',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.orange.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Location Description',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _locationDescriptionController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Near the library entrance, beside the vending machine',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter a location description';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'When did you find it?',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: _selectDateTime,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _foundDateTime != null
+                                ? Colors.orange.shade700
+                                : Colors.grey.shade400,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.grey.shade50,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              color: _foundDateTime != null
+                                  ? Colors.orange.shade700
+                                  : Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _foundDateTime != null
+                                  ? DateFormat('yyyy-MM-dd HH:mm').format(_foundDateTime!)
+                                  : 'Select date and time',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _foundDateTime != null
+                                    ? Colors.grey.shade800
+                                    : Colors.grey.shade600,
+                                fontWeight: _foundDateTime != null
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // ==================== DROP-OFF DESK SELECTION ====================
+                    Text(
+                      'Where will you deposit it?',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_isLoadingDesks)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_dropOffDesks.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.orange.shade200,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.orange.shade700,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No drop-off desks available at the moment.',
+                                style: TextStyle(
+                                  color: Colors.orange.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._dropOffDesks.map((desk) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _selectedDropOffDeskId = desk.id;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: _selectedDropOffDeskId == desk.id
+                                    ? desk.color.withOpacity(0.1)
+                                    : Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _selectedDropOffDeskId == desk.id
+                                      ? desk.color
+                                      : Colors.grey.shade300,
+                                  width: _selectedDropOffDeskId == desk.id ? 2 : 1,
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Row(
                                   children: [
-                                    Icon(
-                                      Icons.add_location,
-                                      size: 48,
-                                      color: Colors.orange.shade700,
+                                    Radio<String>(
+                                      value: desk.id,
+                                      groupValue: _selectedDropOffDeskId,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _selectedDropOffDeskId = value;
+                                        });
+                                      },
+                                      activeColor: desk.color,
                                     ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'Tap to select location',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.orange.shade700,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            desk.name,
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey.shade800,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            desk.description,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.access_time,
+                                                size: 14,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  desk.operatingHours,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.phone,
+                                                size: 14,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                desk.contact,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
@@ -1319,344 +1508,87 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
                               ),
                             ),
                           ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        Text(
-                          'Location Description',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _locationDescriptionController,
-                          maxLines: 3,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. Near the library entrance, beside the vending machine',
-                            hintStyle: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: 14,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter a location description';
-                            }
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        Text(
-                          'When did you find it?',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        InkWell(
-                          onTap: _selectDateTime,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: _foundDateTime != null
-                                    ? Colors.orange.shade700
-                                    : Colors.grey.shade400,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                              color: Colors.grey.shade50,
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  color: _foundDateTime != null
-                                      ? Colors.orange.shade700
-                                      : Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  _foundDateTime != null
-                                      ? DateFormat('yyyy-MM-dd HH:mm').format(_foundDateTime!)
-                                      : 'Select date and time',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: _foundDateTime != null
-                                        ? Colors.grey.shade800
-                                        : Colors.grey.shade600,
-                                    fontWeight: _foundDateTime != null
-                                        ? FontWeight.w500
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // ==================== DROP-OFF DESK SELECTION ====================
-                        Text(
-                          'Where will you deposit it?',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        if (_isLoadingDesks)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: CircularProgressIndicator(),
-                            ),
-                          )
-                        else if (_dropOffDesks.isEmpty)
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.orange.shade200,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  color: Colors.orange.shade700,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'No drop-off desks available at the moment.',
-                                    style: TextStyle(
-                                      color: Colors.orange.shade900,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          ..._dropOffDesks.map((desk) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12.0),
-                              child: InkWell(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedDropOffDeskId = desk.id;
-                                  });
-                                },
+                        );
+                      }).toList(),
+                    const SizedBox(height: 40),
+                    Center(
+                      child: FractionallySizedBox(
+                        widthFactor: 0.8,
+                        child: SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _isSubmitting ? null : _submitReport,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange.shade700,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: _selectedDropOffDeskId == desk.id
-                                        ? desk.color.withOpacity(0.1)
-                                        : Colors.grey.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _selectedDropOffDeskId == desk.id
-                                          ? desk.color
-                                          : Colors.grey.shade300,
-                                      width: _selectedDropOffDeskId == desk.id ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Row(
-                                      children: [
-                                        Radio<String>(
-                                          value: desk.id,
-                                          groupValue: _selectedDropOffDeskId,
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _selectedDropOffDeskId = value;
-                                            });
-                                          },
-                                          activeColor: desk.color,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                desk.name,
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.grey.shade800,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                desk.description,
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.access_time,
-                                                    size: 14,
-                                                    color: Colors.grey.shade600,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Expanded(
-                                                    child: Text(
-                                                      desk.operatingHours,
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors.grey.shade600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.phone,
-                                                    size: 14,
-                                                    color: Colors.grey.shade600,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    desk.contact,
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey.shade600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
                               ),
-                            );
-                          }).toList(),
-
-                        const SizedBox(height: 40),
-
-                        // Submit Report Button
-                        Center(
-                          child: FractionallySizedBox(
-                            widthFactor: 0.8,
-                            child: SizedBox(
-                              height: 50,
-                              child: ElevatedButton(
-                                onPressed: _isSubmitting ? null : _submitReport,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange.shade700,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  disabledBackgroundColor: Colors.grey.shade400,
-                                ),
-                                child: _isSubmitting
-                                    ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                                    : const Text(
-                                  'Submit Report',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                              disabledBackgroundColor: Colors.grey.shade400,
+                            ),
+                            child: _isSubmitting
+                                ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                                : const Text(
+                              'Submit Report',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
                         ),
-
-                        const SizedBox(height: 20),
-
-                        // Save as Draft Button
-                        Center(
-                          child: FractionallySizedBox(
-                            widthFactor: 0.8,
-                            child: SizedBox(
-                              height: 50,
-                              child: OutlinedButton(
-                                onPressed: _isSubmitting ? null : _saveAsDraft,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.orange.shade700,
-                                  side: BorderSide(
-                                    color: Colors.orange.shade700,
-                                    width: 2,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  disabledForegroundColor: Colors.grey.shade400,
-                                ),
-                                child: _isSubmitting
-                                    ? SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.orange.shade700),
-                                  ),
-                                )
-                                    : const Text(
-                                  'Save as Draft',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 80),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    Center(
+                      child: FractionallySizedBox(
+                        widthFactor: 0.8,
+                        child: SizedBox(
+                          height: 50,
+                          child: OutlinedButton(
+                            onPressed: _isSubmitting ? null : _saveAsDraft,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.orange.shade700,
+                              side: BorderSide(
+                                color: Colors.orange.shade700,
+                                width: 2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              disabledForegroundColor: Colors.grey.shade400,
+                            ),
+                            child: _isSubmitting
+                                ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.orange.shade700),
+                              ),
+                            )
+                                : const Text(
+                              'Save as Draft',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 80),
+                  ],
+                ),
               ),
             ),
           ),

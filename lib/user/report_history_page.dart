@@ -3,19 +3,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'lost_item_report.dart';
 import 'found_item_report.dart';
 import 'lost_item_claim.dart';
 
-// Lightweight data structure for history items
 class _HistoryItem {
   final String reportId;
   final String itemName;
   final String category;
   final String itemReturnStatus;
   final DateTime? createdAt;
-  final Uint8List? thumbnailBytes; // Compressed thumbnail only
+  final Uint8List? thumbnailBytes;
 
   _HistoryItem({
     required this.reportId,
@@ -35,9 +33,9 @@ class ReportHistoryPage extends StatefulWidget {
 }
 
 class _ReportHistoryPageState extends State<ReportHistoryPage> {
-  String _selectedTab = 'lost'; // 'lost', 'found', or 'claims'
+  String _selectedTab = 'lost';
 
-  // Manual loading state for each tab
+  // Data for each tab
   List<_HistoryItem>? _lostReports;
   List<_HistoryItem>? _foundReports;
   List<_HistoryItem>? _claimReports;
@@ -50,56 +48,59 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
   bool _foundError = false;
   bool _claimsError = false;
 
+  // Pagination
+  int _lostCurrentPage = 1;
+  int _foundCurrentPage = 1;
+  int _claimsCurrentPage = 1;
+  final int _itemsPerPage = 10;
+
+  // Total pages
+  int get _lostTotalPages {
+    if (_lostReports == null || _lostReports!.isEmpty) return 0;
+    return ((_lostReports!.length - 1) ~/ _itemsPerPage) + 1;
+  }
+
+  int get _foundTotalPages {
+    if (_foundReports == null || _foundReports!.isEmpty) return 0;
+    return ((_foundReports!.length - 1) ~/ _itemsPerPage) + 1;
+  }
+
+  int get _claimsTotalPages {
+    if (_claimReports == null || _claimReports!.isEmpty) return 0;
+    return ((_claimReports!.length - 1) ~/ _itemsPerPage) + 1;
+  }
+
+  // Paginated results
+  List<_HistoryItem> get _lostPaginatedResults {
+    if (_lostReports == null) return [];
+    final startIndex = (_lostCurrentPage - 1) * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, _lostReports!.length);
+    if (startIndex >= _lostReports!.length) return [];
+    return _lostReports!.sublist(startIndex, endIndex);
+  }
+
+  List<_HistoryItem> get _foundPaginatedResults {
+    if (_foundReports == null) return [];
+    final startIndex = (_foundCurrentPage - 1) * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, _foundReports!.length);
+    if (startIndex >= _foundReports!.length) return [];
+    return _foundReports!.sublist(startIndex, endIndex);
+  }
+
+  List<_HistoryItem> get _claimsPaginatedResults {
+    if (_claimReports == null) return [];
+    final startIndex = (_claimsCurrentPage - 1) * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, _claimReports!.length);
+    if (startIndex >= _claimReports!.length) return [];
+    return _claimReports!.sublist(startIndex, endIndex);
+  }
+
   @override
   void initState() {
     super.initState();
     _loadLostReports();
   }
 
-  // Compress image bytes down to a small thumbnail
-  Future<Uint8List?> _createThumbnail(Uint8List? photoBytes) async {
-    if (photoBytes == null) return null;
-    try {
-      final ui.Codec codec = await ui.instantiateImageCodec(
-        photoBytes,
-        targetWidth: 160,
-        targetHeight: 160,
-      );
-      final ui.FrameInfo frameInfo = await codec.getNextFrame();
-      final ui.Image image = frameInfo.image;
-
-      const double targetSize = 80.0;
-      final double scale = targetSize /
-          (image.width > image.height ? image.width.toDouble() : image.height.toDouble());
-      final int newWidth = (image.width * scale).toInt();
-      final int newHeight = (image.height * scale).toInt();
-
-      final ui.PictureRecorder recorder = ui.PictureRecorder();
-      final Canvas canvas = Canvas(
-        recorder,
-        Rect.fromLTWH(0, 0, newWidth.toDouble(), newHeight.toDouble()),
-      );
-      canvas.drawImageRect(
-        image,
-        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
-        Rect.fromLTWH(0, 0, newWidth.toDouble(), newHeight.toDouble()),
-        Paint(),
-      );
-
-      final ui.Picture picture = recorder.endRecording();
-      final ui.Image thumbnailImage = await picture.toImage(newWidth, newHeight);
-      final ByteData? byteData =
-      await thumbnailImage.toByteData(format: ui.ImageByteFormat.png);
-
-      image.dispose();
-      thumbnailImage.dispose();
-      codec.dispose();
-
-      return byteData?.buffer.asUint8List();
-    } catch (e) {
-      return null;
-    }
-  }
 
   Future<void> _loadLostReports() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -113,25 +114,24 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
           .where('userId', isEqualTo: user.uid)
           .where('reportStatus', isEqualTo: 'submitted')
           .orderBy('createdAt', descending: true)
-          .limit(50)
+          .limit(100)  // Increased limit to allow more pagination
           .get();
 
       final List<_HistoryItem> items = [];
       for (var doc in snapshot.docs) {
         final data = doc.data();
 
-        // Extract and compress photo
-        Uint8List? photoBytes;
-        final photoBytesData = data['photoBytes'];
-        if (photoBytesData != null) {
-          if (photoBytesData is Uint8List) {
-            photoBytes = photoBytesData;
-          } else if (photoBytesData is List) {
-            photoBytes = Uint8List.fromList(List<int>.from(photoBytesData));
+        Uint8List? thumbnailBytes;
+        final thumbnailBytesData = data['thumbnailBytes'];
+        if (thumbnailBytesData != null) {
+          if (thumbnailBytesData is Uint8List) {
+            thumbnailBytes = thumbnailBytesData;
+          } else if (thumbnailBytesData is List) {
+            thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
           }
         }
 
-        final thumbnail = await _createThumbnail(photoBytes);
+        // Thumbnail is now loaded directly from Firestore
 
         items.add(_HistoryItem(
           reportId: doc.id,
@@ -139,13 +139,14 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
           category: data['category'] ?? 'Uncategorized',
           itemReturnStatus: data['itemReturnStatus'] ?? 'pending',
           createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-          thumbnailBytes: thumbnail,
+          thumbnailBytes: thumbnailBytes,
         ));
       }
 
       if (mounted) setState(() {
         _lostReports = items;
         _isLoadingLost = false;
+        _lostCurrentPage = 1; // Reset to page 1
       });
     } catch (e) {
       if (mounted) setState(() {
@@ -167,25 +168,24 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
           .where('userId', isEqualTo: user.uid)
           .where('reportStatus', isEqualTo: 'submitted')
           .orderBy('createdAt', descending: true)
-          .limit(50)
+          .limit(100)
           .get();
 
       final List<_HistoryItem> items = [];
       for (var doc in snapshot.docs) {
         final data = doc.data();
 
-        // Extract and compress photo
-        Uint8List? photoBytes;
-        final photoBytesData = data['photoBytes'];
-        if (photoBytesData != null) {
-          if (photoBytesData is Uint8List) {
-            photoBytes = photoBytesData;
-          } else if (photoBytesData is List) {
-            photoBytes = Uint8List.fromList(List<int>.from(photoBytesData));
+        Uint8List? thumbnailBytes;
+        final thumbnailBytesData = data['thumbnailBytes'];
+        if (thumbnailBytesData != null) {
+          if (thumbnailBytesData is Uint8List) {
+            thumbnailBytes = thumbnailBytesData;
+          } else if (thumbnailBytesData is List) {
+            thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
           }
         }
 
-        final thumbnail = await _createThumbnail(photoBytes);
+        // Thumbnail is now loaded directly from Firestore
 
         items.add(_HistoryItem(
           reportId: doc.id,
@@ -193,13 +193,14 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
           category: data['category'] ?? 'Uncategorized',
           itemReturnStatus: data['itemReturnStatus'] ?? 'pending',
           createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-          thumbnailBytes: thumbnail,
+          thumbnailBytes: thumbnailBytes,
         ));
       }
 
       if (mounted) setState(() {
         _foundReports = items;
         _isLoadingFound = false;
+        _foundCurrentPage = 1;
       });
     } catch (e) {
       if (mounted) setState(() {
@@ -220,31 +221,18 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
           .collection('lost_item_claims')
           .where('userId', isEqualTo: user.uid)
           .orderBy('createdAt', descending: true)
-          .limit(50)
+          .limit(100)
           .get();
 
       final List<_HistoryItem> items = [];
       for (var doc in snapshot.docs) {
         final data = doc.data();
 
-        // For claims, try to get the proof photo
-        Uint8List? photoBytes;
-        final photoBytesData = data['proofPhotoBytes'];
-        if (photoBytesData != null) {
-          if (photoBytesData is Uint8List) {
-            photoBytes = photoBytesData;
-          } else if (photoBytesData is List) {
-            photoBytes = Uint8List.fromList(List<int>.from(photoBytesData));
-          }
-        }
-
-        final thumbnail = await _createThumbnail(photoBytes);
-
-        // For claims, we need to get the item info from the found report
+        // For claims, get thumbnail from the associated found report
+        Uint8List? thumbnailBytes;
         String itemName = 'Claimed Item';
         String category = 'Unknown';
 
-        // Try to load item info from the found report
         try {
           final foundItemReportId = data['foundItemReportId'] as String?;
           if (foundItemReportId != null) {
@@ -257,6 +245,16 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
               final foundData = foundDoc.data()!;
               itemName = foundData['itemName'] ?? itemName;
               category = foundData['category'] ?? category;
+
+              // Get thumbnailBytes from found report
+              final thumbnailBytesData = foundData['thumbnailBytes'];
+              if (thumbnailBytesData != null) {
+                if (thumbnailBytesData is Uint8List) {
+                  thumbnailBytes = thumbnailBytesData;
+                } else if (thumbnailBytesData is List) {
+                  thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
+                }
+              }
             }
           }
         } catch (e) {
@@ -269,13 +267,14 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
           category: category,
           itemReturnStatus: data['claimStatus'] ?? 'pending',
           createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-          thumbnailBytes: thumbnail,
+          thumbnailBytes: thumbnailBytes,
         ));
       }
 
       if (mounted) setState(() {
         _claimReports = items;
         _isLoadingClaims = false;
+        _claimsCurrentPage = 1;
       });
     } catch (e) {
       if (mounted) setState(() {
@@ -295,7 +294,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
       ),
       body: Column(
         children: [
-          // Tab Selection (3 tabs)
           Container(
             margin: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -349,8 +347,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
               ],
             ),
           ),
-
-          // Report List
           Expanded(
             child: _selectedTab == 'lost'
                 ? _buildLostItemReportList()
@@ -399,9 +395,7 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
     }
 
     if (_isLoadingLost) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_lostError) {
@@ -409,18 +403,11 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red.shade300,
-            ),
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
               'Error loading reports',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -432,45 +419,58 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
       );
     }
 
-    final reports = _lostReports ?? [];
+    final allReports = _lostReports ?? [];
+    final reports = _lostPaginatedResults;
+    final totalReports = allReports.length;
 
-    if (reports.isEmpty) {
+    if (totalReports == 0) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.history,
-              size: 80,
-              color: Colors.grey.shade300,
-            ),
+            Icon(Icons.history, size: 80, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             Text(
               'No submitted lost item reports',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
           ],
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadLostReports,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: reports.length,
-        itemBuilder: (context, index) {
-          final item = reports[index];
-          return _buildReportCard(
-            context: context,
-            item: item,
-            reportType: 'lost',
-          );
-        },
-      ),
+    return Column(
+      children: [
+        if (totalReports > 0)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              '$totalReports report${totalReports == 1 ? '' : 's'} (Page $_lostCurrentPage of $_lostTotalPages)',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadLostReports,
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: reports.length,
+              itemBuilder: (context, index) {
+                return _buildReportCard(
+                  context: context,
+                  item: reports[index],
+                  reportType: 'lost',
+                );
+              },
+            ),
+          ),
+        ),
+        if (_lostTotalPages > 1) _buildPagination('lost'),
+      ],
     );
   }
 
@@ -483,9 +483,7 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
     }
 
     if (_isLoadingFound) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_foundError) {
@@ -493,18 +491,11 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red.shade300,
-            ),
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
               'Error loading reports',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -516,45 +507,58 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
       );
     }
 
-    final reports = _foundReports ?? [];
+    final allReports = _foundReports ?? [];
+    final reports = _foundPaginatedResults;
+    final totalReports = allReports.length;
 
-    if (reports.isEmpty) {
+    if (totalReports == 0) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.history,
-              size: 80,
-              color: Colors.grey.shade300,
-            ),
+            Icon(Icons.history, size: 80, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             Text(
               'No submitted found item reports',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
           ],
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadFoundReports,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: reports.length,
-        itemBuilder: (context, index) {
-          final item = reports[index];
-          return _buildReportCard(
-            context: context,
-            item: item,
-            reportType: 'found',
-          );
-        },
-      ),
+    return Column(
+      children: [
+        if (totalReports > 0)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              '$totalReports report${totalReports == 1 ? '' : 's'} (Page $_foundCurrentPage of $_foundTotalPages)',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadFoundReports,
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: reports.length,
+              itemBuilder: (context, index) {
+                return _buildReportCard(
+                  context: context,
+                  item: reports[index],
+                  reportType: 'found',
+                );
+              },
+            ),
+          ),
+        ),
+        if (_foundTotalPages > 1) _buildPagination('found'),
+      ],
     );
   }
 
@@ -567,9 +571,7 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
     }
 
     if (_isLoadingClaims) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_claimsError) {
@@ -577,18 +579,11 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red.shade300,
-            ),
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
               'Error loading claims',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -600,44 +595,166 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
       );
     }
 
-    final claims = _claimReports ?? [];
+    final allClaims = _claimReports ?? [];
+    final claims = _claimsPaginatedResults;
+    final totalClaims = allClaims.length;
 
-    if (claims.isEmpty) {
+    if (totalClaims == 0) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.receipt_long,
-              size: 80,
-              color: Colors.grey.shade300,
-            ),
+            Icon(Icons.receipt_long, size: 80, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             Text(
               'No submitted claims',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
           ],
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadClaimReports,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: claims.length,
-        itemBuilder: (context, index) {
-          final item = claims[index];
-          return _buildReportCard(
-            context: context,
-            item: item,
-            reportType: 'claims',
-          );
-        },
+    return Column(
+      children: [
+        if (totalClaims > 0)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              '$totalClaims claim${totalClaims == 1 ? '' : 's'} (Page $_claimsCurrentPage of $_claimsTotalPages)',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadClaimReports,
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: claims.length,
+              itemBuilder: (context, index) {
+                return _buildReportCard(
+                  context: context,
+                  item: claims[index],
+                  reportType: 'claims',
+                );
+              },
+            ),
+          ),
+        ),
+        if (_claimsTotalPages > 1) _buildPagination('claims'),
+      ],
+    );
+  }
+
+  Widget _buildPagination(String type) {
+    int currentPage, totalPages;
+    void Function(int) onPageChange;
+
+    if (type == 'lost') {
+      currentPage = _lostCurrentPage;
+      totalPages = _lostTotalPages;
+      onPageChange = (page) => setState(() => _lostCurrentPage = page);
+    } else if (type == 'found') {
+      currentPage = _foundCurrentPage;
+      totalPages = _foundTotalPages;
+      onPageChange = (page) => setState(() => _foundCurrentPage = page);
+    } else {
+      currentPage = _claimsCurrentPage;
+      totalPages = _claimsTotalPages;
+      onPageChange = (page) => setState(() => _claimsCurrentPage = page);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: currentPage > 1 ? () => onPageChange(currentPage - 1) : null,
+            color: Colors.indigo.shade700,
+          ),
+          const SizedBox(width: 8),
+          ..._buildPageNumbers(currentPage, totalPages, onPageChange),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: currentPage < totalPages ? () => onPageChange(currentPage + 1) : null,
+            color: Colors.indigo.shade700,
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPageNumbers(int currentPage, int totalPages, void Function(int) onPageChange) {
+    List<Widget> pageButtons = [];
+    int start = (currentPage - 2).clamp(1, totalPages);
+    int end = (currentPage + 2).clamp(1, totalPages);
+
+    if (start > 1) {
+      pageButtons.add(_buildPageButton(1, currentPage, onPageChange));
+      if (start > 2) {
+        pageButtons.add(Text('...', style: TextStyle(color: Colors.grey.shade600)));
+      }
+    }
+
+    for (int i = start; i <= end; i++) {
+      pageButtons.add(_buildPageButton(i, currentPage, onPageChange));
+    }
+
+    if (end < totalPages) {
+      if (end < totalPages - 1) {
+        pageButtons.add(Text('...', style: TextStyle(color: Colors.grey.shade600)));
+      }
+      pageButtons.add(_buildPageButton(totalPages, currentPage, onPageChange));
+    }
+
+    return pageButtons;
+  }
+
+  Widget _buildPageButton(int page, int currentPage, void Function(int) onPageChange) {
+    final isCurrentPage = page == currentPage;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: InkWell(
+        onTap: () => onPageChange(page),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: isCurrentPage ? Colors.indigo.shade700 : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isCurrentPage ? Colors.indigo.shade700 : Colors.grey.shade300,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              '$page',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isCurrentPage ? FontWeight.w600 : FontWeight.normal,
+                color: isCurrentPage ? Colors.white : Colors.grey.shade700,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -645,20 +762,18 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
   Widget _buildReportCard({
     required BuildContext context,
     required _HistoryItem item,
-    required String reportType, // 'lost', 'found', or 'claims'
+    required String reportType,
   }) {
     String formattedDate = 'Unknown date';
     if (item.createdAt != null) {
       formattedDate = DateFormat('MMM dd, yyyy HH:mm').format(item.createdAt!);
     }
 
-    // Status color and text
     Color statusColor;
     Color statusTextColor;
     String statusText;
 
     if (reportType == 'claims') {
-      // For claims, use claimStatus values
       switch (item.itemReturnStatus) {
         case 'approved':
           statusColor = Colors.green;
@@ -678,7 +793,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
           break;
       }
     } else {
-      // For reports, use itemReturnStatus values
       switch (item.itemReturnStatus) {
         case 'returned':
           statusColor = Colors.green;
@@ -714,7 +828,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Image or placeholder (using compressed thumbnail)
               Container(
                 width: 80,
                 height: 80,
@@ -737,8 +850,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
                 ),
               ),
               const SizedBox(width: 16),
-
-              // Report info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -826,8 +937,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
                   ],
                 ),
               ),
-
-              // Delete button (only for reports, not claims)
               if (reportType != 'claims')
                 IconButton(
                   icon: Icon(
@@ -928,6 +1037,12 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
             duration: Duration(seconds: 2),
           ),
         );
+        // Reload the appropriate list
+        if (reportType == 'lost') {
+          await _loadLostReports();
+        } else {
+          await _loadFoundReports();
+        }
       }
     } catch (e) {
       if (mounted) {

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'lost_item_report.dart';
 import 'found_item_report.dart';
 
@@ -18,19 +17,24 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
   bool _isFilterExpanded = false;
   bool _isSearching = false;
 
-  // Search results
-  List<_SearchResultItem>? _allSearchResults; // All results
-  bool _hasSearched = false;
-
-  // Pagination
+  // Pagination state
+  Map<int, List<_SearchResultItem>> _pageCache = {}; // Cache for loaded pages
   int _currentPage = 1;
   final int _itemsPerPage = 10;
+  int _totalResults = 0;
+  bool _hasMoreResults = true;
+
+  // Last documents for pagination
+  DocumentSnapshot? _lastLostDoc;
+  DocumentSnapshot? _lastFoundDoc;
+
+  bool _hasSearched = false;
 
   // Filter options
   Set<String> _selectedCategories = {};
-  String _selectedReportType = 'all'; // 'all', 'lost', 'found'
-  String _timeSortOption = 'none'; // 'none', 'latest', 'oldest'
-  String _alphaSortOption = 'none'; // 'none', 'a-z', 'z-a'
+  String _selectedReportType = 'all';
+  String _timeSortOption = 'none';
+  String _alphaSortOption = 'none';
   DateTime? _startDate;
   DateTime? _endDate;
 
@@ -54,25 +58,16 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
     super.dispose();
   }
 
-  // Get current page results
-  List<_SearchResultItem> get _currentPageResults {
-    if (_allSearchResults == null) return [];
-    final startIndex = (_currentPage - 1) * _itemsPerPage;
-    final endIndex = startIndex + _itemsPerPage;
-    if (startIndex >= _allSearchResults!.length) return [];
-    return _allSearchResults!.sublist(
-      startIndex,
-      endIndex > _allSearchResults!.length ? _allSearchResults!.length : endIndex,
-    );
-  }
-
-  // Get total pages
   int get _totalPages {
-    if (_allSearchResults == null || _allSearchResults!.isEmpty) return 0;
-    return ((_allSearchResults!.length - 1) ~/ _itemsPerPage) + 1;
+    if (_totalResults == 0) return 0;
+    return ((_totalResults - 1) ~/ _itemsPerPage) + 1;
   }
 
-  Future<void> _performSearch() async {
+  List<_SearchResultItem> get _currentPageResults {
+    return _pageCache[_currentPage] ?? [];
+  }
+
+  Future<void> _performSearch({bool isNewSearch = true}) async {
     if (_searchController.text.trim().isEmpty &&
         _selectedCategories.isEmpty &&
         _selectedReportType == 'all' &&
@@ -89,76 +84,22 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
 
     setState(() {
       _isSearching = true;
-      _hasSearched = true;
-      _currentPage = 1; // Reset to page 1
+      if (isNewSearch) {
+        _hasSearched = true;
+        _currentPage = 1;
+        _pageCache.clear();
+        _totalResults = 0;
+        _hasMoreResults = true;
+        _lastLostDoc = null;
+        _lastFoundDoc = null;
+      }
     });
 
     try {
-      final results = <_SearchResultItem>[];
-
-      // Search in lost items if needed
-      if (_selectedReportType == 'all' || _selectedReportType == 'lost') {
-        final lostResults = await _searchInCollection(
-          'lost_item_reports',
-          'lost',
-        );
-        results.addAll(lostResults);
-      }
-
-      // Search in found items if needed
-      if (_selectedReportType == 'all' || _selectedReportType == 'found') {
-        final foundResults = await _searchInCollection(
-          'found_item_reports',
-          'found',
-        );
-        results.addAll(foundResults);
-      }
-
-      // Apply combined sorting
-      if (_timeSortOption != 'none' || _alphaSortOption != 'none') {
-        results.sort((a, b) {
-          // First apply time sorting if selected
-          if (_timeSortOption == 'latest') {
-            if (a.createdAt == null && b.createdAt == null) {
-              // If both null, continue to alphabetical sort
-            } else if (a.createdAt == null) return 1;
-            else if (b.createdAt == null) return -1;
-            else {
-              final timeCompare = b.createdAt!.compareTo(a.createdAt!);
-              if (timeCompare != 0) return timeCompare;
-            }
-          } else if (_timeSortOption == 'oldest') {
-            if (a.createdAt == null && b.createdAt == null) {
-              // If both null, continue to alphabetical sort
-            } else if (a.createdAt == null) return 1;
-            else if (b.createdAt == null) return -1;
-            else {
-              final timeCompare = a.createdAt!.compareTo(b.createdAt!);
-              if (timeCompare != 0) return timeCompare;
-            }
-          }
-
-          // Then apply alphabetical sorting if selected
-          if (_alphaSortOption == 'a-z') {
-            return a.itemName.toLowerCase().compareTo(b.itemName.toLowerCase());
-          } else if (_alphaSortOption == 'z-a') {
-            return b.itemName.toLowerCase().compareTo(a.itemName.toLowerCase());
-          }
-
-          return 0;
-        });
-      }
-
-      setState(() {
-        _allSearchResults = results;
-        _isSearching = false;
-      });
+      await _loadPage(_currentPage);
     } catch (e) {
       print('Search error: $e');
       if (mounted) {
-        setState(() {
-          _isSearching = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Search error: ${e.toString()}'),
@@ -166,13 +107,96 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           ),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+      }
     }
+  }
+
+  Future<void> _loadPage(int page) async {
+    // Check if page is already cached
+    if (_pageCache.containsKey(page)) {
+      setState(() {});
+      return;
+    }
+
+    final results = <_SearchResultItem>[];
+
+    // Calculate how many items to skip
+    final itemsToSkip = (page - 1) * _itemsPerPage;
+
+    // Search in lost items if needed
+    if (_selectedReportType == 'all' || _selectedReportType == 'lost') {
+      final lostResults = await _searchInCollection(
+        'lost_item_reports',
+        'lost',
+        page: page,
+      );
+      results.addAll(lostResults);
+    }
+
+    // Search in found items if needed
+    if (_selectedReportType == 'all' || _selectedReportType == 'found') {
+      final foundResults = await _searchInCollection(
+        'found_item_reports',
+        'found',
+        page: page,
+      );
+      results.addAll(foundResults);
+    }
+
+    // Apply sorting
+    if (_timeSortOption != 'none' || _alphaSortOption != 'none') {
+      results.sort((a, b) {
+        if (_timeSortOption == 'latest') {
+          if (a.createdAt == null && b.createdAt == null) {
+          } else if (a.createdAt == null) return 1;
+          else if (b.createdAt == null) return -1;
+          else {
+            final timeCompare = b.createdAt!.compareTo(a.createdAt!);
+            if (timeCompare != 0) return timeCompare;
+          }
+        } else if (_timeSortOption == 'oldest') {
+          if (a.createdAt == null && b.createdAt == null) {
+          } else if (a.createdAt == null) return 1;
+          else if (b.createdAt == null) return -1;
+          else {
+            final timeCompare = a.createdAt!.compareTo(b.createdAt!);
+            if (timeCompare != 0) return timeCompare;
+          }
+        }
+
+        if (_alphaSortOption == 'a-z') {
+          return a.itemName.toLowerCase().compareTo(b.itemName.toLowerCase());
+        } else if (_alphaSortOption == 'z-a') {
+          return b.itemName.toLowerCase().compareTo(a.itemName.toLowerCase());
+        }
+
+        return 0;
+      });
+    }
+
+    setState(() {
+      _pageCache[page] = results;
+      if (page == 1) {
+        // For first page, estimate total results (we'll know exact count as we paginate)
+        _totalResults = results.length;
+        _hasMoreResults = results.length >= _itemsPerPage;
+      } else {
+        _totalResults = ((page - 1) * _itemsPerPage) + results.length;
+        _hasMoreResults = results.length >= _itemsPerPage;
+      }
+    });
   }
 
   Future<List<_SearchResultItem>> _searchInCollection(
       String collectionName,
-      String reportType,
-      ) async {
+      String reportType, {
+        required int page,
+      }) async {
     Query query = FirebaseFirestore.instance
         .collection(collectionName)
         .where('reportStatus', isEqualTo: 'submitted');
@@ -190,13 +214,30 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           .where(dateField, isLessThanOrEqualTo: Timestamp.fromDate(_endDate!));
     }
 
-    // Fetch all matching results (removed limit)
-    final snapshot = await query.get();
+    // Apply ordering (required for pagination)
+    query = query.orderBy('createdAt', descending: true);
 
+    // For pages after the first, start after the last document
+    if (page > 1) {
+      // We need to fetch all previous items to know where to start
+      // This is a limitation when using client-side sorting
+      final skipCount = (page - 1) * _itemsPerPage;
+      query = query.limit(skipCount + _itemsPerPage);
+    } else {
+      query = query.limit(_itemsPerPage);
+    }
+
+    final snapshot = await query.get();
     final results = <_SearchResultItem>[];
     final searchTerm = _searchController.text.trim().toLowerCase();
 
+    // Calculate start and end indices for this page
+    final startIdx = page > 1 ? (page - 1) * _itemsPerPage : 0;
+    final endIdx = page * _itemsPerPage;
+
+    int currentIdx = 0;
     int processedCount = 0;
+
     for (final doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
 
@@ -213,84 +254,44 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
         }
       }
 
-      // Convert photo and create thumbnail
-      Uint8List? photoBytes;
-      final photoBytesData = data['photoBytes'];
-      if (photoBytesData != null) {
-        if (photoBytesData is Uint8List) {
-          photoBytes = photoBytesData;
-        } else if (photoBytesData is List) {
-          photoBytes = Uint8List.fromList(List<int>.from(photoBytesData));
+      // Only process items for current page
+      if (currentIdx >= startIdx && currentIdx < endIdx) {
+        // Get thumbnailBytes directly from Firestore
+        Uint8List? thumbnailBytes;
+        final thumbnailBytesData = data['thumbnailBytes'];
+        if (thumbnailBytesData != null) {
+          if (thumbnailBytesData is Uint8List) {
+            thumbnailBytes = thumbnailBytesData;
+          } else if (thumbnailBytesData is List) {
+            thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
+          }
+        }
+
+        results.add(_SearchResultItem(
+          reportId: doc.id,
+          reportType: reportType,
+          itemName: data['itemName'] as String? ?? 'Untitled',
+          category: data['category'] as String? ?? 'Unknown',
+          thumbnailBytes: thumbnailBytes,
+          createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+        ));
+
+        processedCount++;
+        if (processedCount % 3 == 0) {
+          await Future.delayed(const Duration(milliseconds: 5));
         }
       }
 
-      // Create thumbnail and immediately release original
-      final thumbnail = await _createThumbnail(photoBytes);
-      photoBytes = null;
+      currentIdx++;
 
-      results.add(_SearchResultItem(
-        reportId: doc.id,
-        reportType: reportType,
-        itemName: data['itemName'] as String? ?? 'Untitled',
-        category: data['category'] as String? ?? 'Unknown',
-        thumbnailBytes: thumbnail,
-        createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-      ));
-
-      processedCount++;
-      // Allow GC to run every few documents
-      if (processedCount % 5 == 0) {
-        await Future.delayed(const Duration(milliseconds: 5));
-      }
+      // Stop if we've processed enough items for this page
+      if (results.length >= _itemsPerPage) break;
     }
 
     return results;
   }
 
-  Future<Uint8List?> _createThumbnail(Uint8List? photoBytes) async {
-    if (photoBytes == null) return null;
-    try {
-      final ui.Codec codec = await ui.instantiateImageCodec(
-        photoBytes,
-        targetWidth: 100,
-        targetHeight: 100,
-      );
-      final ui.FrameInfo frameInfo = await codec.getNextFrame();
-      final ui.Image image = frameInfo.image;
 
-      const double targetSize = 50.0;
-      final double scale = targetSize /
-          (image.width > image.height ? image.width.toDouble() : image.height.toDouble());
-      final int newWidth = (image.width * scale).toInt();
-      final int newHeight = (image.height * scale).toInt();
-
-      final ui.PictureRecorder recorder = ui.PictureRecorder();
-      final Canvas canvas = Canvas(
-        recorder,
-        Rect.fromLTWH(0, 0, newWidth.toDouble(), newHeight.toDouble()),
-      );
-      canvas.drawImageRect(
-        image,
-        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
-        Rect.fromLTWH(0, 0, newWidth.toDouble(), newHeight.toDouble()),
-        Paint(),
-      );
-
-      final ui.Picture picture = recorder.endRecording();
-      final ui.Image thumbnailImage = await picture.toImage(newWidth, newHeight);
-      final ByteData? byteData =
-      await thumbnailImage.toByteData(format: ui.ImageByteFormat.png);
-
-      image.dispose();
-      thumbnailImage.dispose();
-      codec.dispose();
-
-      return byteData?.buffer.asUint8List();
-    } catch (e) {
-      print('Thumbnail creation error: $e');
-      return null;
-    }
-  }
 
   Future<void> _selectDateRange() async {
     final DateTimeRange? picked = await showDateRangePicker(
@@ -331,10 +332,30 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       _startDate = null;
       _endDate = null;
       _searchController.clear();
-      _allSearchResults = null;
+      _pageCache.clear();
       _hasSearched = false;
       _currentPage = 1;
+      _totalResults = 0;
     });
+  }
+
+  Future<void> _goToPage(int page) async {
+    if (page < 1 || (page > _totalPages && !_hasMoreResults)) return;
+
+    setState(() {
+      _currentPage = page;
+    });
+
+    // Load page if not cached
+    if (!_pageCache.containsKey(page)) {
+      setState(() {
+        _isSearching = true;
+      });
+      await _loadPage(page);
+      setState(() {
+        _isSearching = false;
+      });
+    }
   }
 
   @override
@@ -359,210 +380,207 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       ),
       body: Stack(
         children: [
-          // Main content
           Column(
             children: [
-              // Search Bar
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.shade200,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search by name, description, or location...',
-                        prefixIcon: Icon(Icons.search, color: Colors.indigo.shade700),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                            });
-                          },
-                        )
-                            : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.indigo.shade700, width: 2),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                      ),
-                      onChanged: (value) {
-                        setState(() {});
-                      },
-                      onSubmitted: (value) {
-                        _performSearch();
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _isSearching ? null : _performSearch,
-                            icon: _isSearching
-                                ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                                : const Icon(Icons.search),
-                            label: Text(_isSearching ? 'Searching...' : 'Search'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.indigo.shade700,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _isFilterExpanded = !_isFilterExpanded;
-                            });
-                          },
-                          icon: Icon(
-                            _isFilterExpanded ? Icons.expand_less : Icons.tune,
-                            color: Colors.indigo.shade700,
-                          ),
-                          label: Text(
-                            'Filters',
-                            style: TextStyle(color: Colors.indigo.shade700),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                            side: BorderSide(color: Colors.indigo.shade700),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Results Section
-              Expanded(
-                child: _buildResultsSection(),
-              ),
+              _buildSearchBar(),
+              Expanded(child: _buildResultsSection()),
             ],
           ),
+          if (_isFilterExpanded) _buildFilterOverlay(),
+        ],
+      ),
+    );
+  }
 
-          // Filter Overlay (appears on top)
-          if (_isFilterExpanded)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () {
+  Widget _buildSearchBar() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search by name, description, or location...',
+              prefixIcon: Icon(Icons.search, color: Colors.indigo.shade700),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
                   setState(() {
-                    _isFilterExpanded = false;
+                    _searchController.clear();
                   });
                 },
-                child: Container(
-                  color: Colors.black54,
-                  child: SafeArea(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 140), // Space for search bar
-                        Flexible(
-                          child: GestureDetector(
-                            onTap: () {}, // Prevent closing when tapping filter
-                            child: Container(
-                              margin: const EdgeInsets.all(16),
-                              constraints: BoxConstraints(
-                                maxHeight: MediaQuery.of(context).size.height * 0.6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Filter Header
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.indigo.shade700,
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(16),
-                                        topRight: Radius.circular(16),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.tune, color: Colors.white),
-                                        const SizedBox(width: 8),
-                                        const Text(
-                                          'Filters',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        IconButton(
-                                          icon: const Icon(Icons.close, color: Colors.white),
-                                          onPressed: () {
-                                            setState(() {
-                                              _isFilterExpanded = false;
-                                            });
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  // Filter Content
-                                  Flexible(
-                                    child: SingleChildScrollView(
-                                      padding: const EdgeInsets.all(16),
-                                      child: _buildFilterContent(),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+              )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.indigo.shade700, width: 2),
+              ),
+              filled: true,
+              fillColor: Colors.grey.shade50,
+            ),
+            onChanged: (value) {
+              setState(() {});
+            },
+            onSubmitted: (value) {
+              _performSearch(isNewSearch: true);
+            },
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _isSearching ? null : () => _performSearch(isNewSearch: true),
+                  icon: _isSearching
+                      ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                      : const Icon(Icons.search),
+                  label: Text(_isSearching ? 'Searching...' : 'Search'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isFilterExpanded = !_isFilterExpanded;
+                  });
+                },
+                icon: Icon(
+                  _isFilterExpanded ? Icons.expand_less : Icons.tune,
+                  color: Colors.indigo.shade700,
+                ),
+                label: Text(
+                  'Filters',
+                  style: TextStyle(color: Colors.indigo.shade700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  side: BorderSide(color: Colors.indigo.shade700),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFilterOverlay() {
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _isFilterExpanded = false;
+          });
+        },
+        child: Container(
+          color: Colors.black54,
+          child: SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 140),
+                Flexible(
+                  child: GestureDetector(
+                    onTap: () {},
+                    child: Container(
+                      margin: const EdgeInsets.all(16),
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.indigo.shade700,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(16),
+                                topRight: Radius.circular(16),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.tune, color: Colors.white),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Filters',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const Spacer(),
+                                IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isFilterExpanded = false;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          Flexible(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.all(16),
+                              child: _buildFilterContent(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -571,7 +589,6 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Report Type Filter
         _buildFilterTitle('Report Type'),
         const SizedBox(height: 8),
         Row(
@@ -584,8 +601,6 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           ],
         ),
         const SizedBox(height: 20),
-
-        // Category Filter
         _buildFilterTitle('Categories'),
         const SizedBox(height: 8),
         Wrap(
@@ -615,8 +630,6 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           }).toList(),
         ),
         const SizedBox(height: 20),
-
-        // Date Range Filter
         _buildFilterTitle('Date Range'),
         const SizedBox(height: 8),
         InkWell(
@@ -659,8 +672,6 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Sort By Time
         _buildFilterTitle('Sort By Time'),
         const SizedBox(height: 8),
         Wrap(
@@ -673,8 +684,6 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           ],
         ),
         const SizedBox(height: 20),
-
-        // Sort By Alphabet
         _buildFilterTitle('Sort By Alphabet'),
         const SizedBox(height: 8),
         Wrap(
@@ -787,7 +796,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       );
     }
 
-    if (_isSearching) {
+    if (_isSearching && _currentPage == 1) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -801,9 +810,8 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
     }
 
     final results = _currentPageResults;
-    final totalResults = _allSearchResults?.length ?? 0;
 
-    if (totalResults == 0) {
+    if (_totalResults == 0) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -834,7 +842,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
         Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
-            '$totalResults result${totalResults == 1 ? '' : 's'} found (Page $_currentPage of $_totalPages)',
+            '${_totalResults}+ result${_totalResults == 1 ? '' : 's'} found (Page $_currentPage${_hasMoreResults ? '+' : ' of $_totalPages'})',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -843,7 +851,9 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           ),
         ),
         Expanded(
-          child: ListView.builder(
+          child: _isSearching
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: results.length,
             itemBuilder: (context, index) {
@@ -851,8 +861,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
             },
           ),
         ),
-        // Pagination
-        if (_totalPages > 1) _buildPagination(),
+        if (_totalPages > 1 || _hasMoreResults) _buildPagination(),
       ],
     );
   }
@@ -873,33 +882,18 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Previous button
           IconButton(
             icon: const Icon(Icons.chevron_left),
-            onPressed: _currentPage > 1
-                ? () {
-              setState(() {
-                _currentPage--;
-              });
-            }
-                : null,
+            onPressed: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
             color: Colors.indigo.shade700,
           ),
           const SizedBox(width: 8),
-
-          // Page numbers
           ..._buildPageNumbers(),
-
           const SizedBox(width: 8),
-          // Next button
           IconButton(
             icon: const Icon(Icons.chevron_right),
-            onPressed: _currentPage < _totalPages
-                ? () {
-              setState(() {
-                _currentPage++;
-              });
-            }
+            onPressed: (_hasMoreResults || _currentPage < _totalPages)
+                ? () => _goToPage(_currentPage + 1)
                 : null,
             color: Colors.indigo.shade700,
           ),
@@ -910,10 +904,10 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
 
   List<Widget> _buildPageNumbers() {
     List<Widget> pageButtons = [];
-    int start = (_currentPage - 2).clamp(1, _totalPages);
-    int end = (_currentPage + 2).clamp(1, _totalPages);
+    final maxPages = _hasMoreResults ? _currentPage + 2 : _totalPages;
+    int start = (_currentPage - 2).clamp(1, maxPages);
+    int end = (_currentPage + 2).clamp(1, maxPages);
 
-    // Show first page
     if (start > 1) {
       pageButtons.add(_buildPageButton(1));
       if (start > 2) {
@@ -921,13 +915,13 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       }
     }
 
-    // Show page range
     for (int i = start; i <= end; i++) {
       pageButtons.add(_buildPageButton(i));
     }
 
-    // Show last page
-    if (end < _totalPages) {
+    if (_hasMoreResults && end == _currentPage + 2) {
+      pageButtons.add(Text('...', style: TextStyle(color: Colors.grey.shade600)));
+    } else if (end < _totalPages) {
       if (end < _totalPages - 1) {
         pageButtons.add(Text('...', style: TextStyle(color: Colors.grey.shade600)));
       }
@@ -942,11 +936,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: InkWell(
-        onTap: () {
-          setState(() {
-            _currentPage = page;
-          });
-        },
+        onTap: () => _goToPage(page),
         borderRadius: BorderRadius.circular(8),
         child: Container(
           width: 40,
