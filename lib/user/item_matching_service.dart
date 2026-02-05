@@ -6,7 +6,7 @@ import 'dart:math' as math;
 // ==================== MATCHING CONFIGURATION ====================
 class MatchingConfig {
   // Matching thresholds
-  static const double highMatchThreshold = 80.0; // 80%+ creates notification
+  static const double highMatchThreshold = 70.0; // 70%+ creates notification
   static const double minMatchThreshold = 50.0;  // 50%+ considered
 
   // Field weights (must sum to 100)
@@ -31,8 +31,6 @@ class ItemMatchingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  /// 安全地将任何数字类型转换为 double
-  /// Firestore 可能返回 int 或 double，这个函数确保总是返回 double
   double _toDouble(dynamic value, double defaultValue) {
     if (value == null) return defaultValue;
     if (value is double) return value;
