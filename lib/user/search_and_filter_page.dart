@@ -17,16 +17,10 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
   bool _isFilterExpanded = false;
   bool _isSearching = false;
 
-  // Pagination state
-  Map<int, List<_SearchResultItem>> _pageCache = {}; // Cache for loaded pages
+  // All results loaded at once
+  List<_SearchResultItem> _allResults = [];
   int _currentPage = 1;
   final int _itemsPerPage = 10;
-  int _totalResults = 0;
-  bool _hasMoreResults = true;
-
-  // Last documents for pagination
-  DocumentSnapshot? _lastLostDoc;
-  DocumentSnapshot? _lastFoundDoc;
 
   bool _hasSearched = false;
 
@@ -59,12 +53,16 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
   }
 
   int get _totalPages {
-    if (_totalResults == 0) return 0;
-    return ((_totalResults - 1) ~/ _itemsPerPage) + 1;
+    if (_allResults.isEmpty) return 0;
+    return ((_allResults.length - 1) ~/ _itemsPerPage) + 1;
   }
 
   List<_SearchResultItem> get _currentPageResults {
-    return _pageCache[_currentPage] ?? [];
+    if (_allResults.isEmpty) return [];
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = (startIndex + _itemsPerPage).clamp(0, _allResults.length);
+    if (startIndex >= _allResults.length) return [];
+    return _allResults.sublist(startIndex, endIndex);
   }
 
   Future<void> _performSearch({bool isNewSearch = true}) async {
@@ -87,16 +85,12 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       if (isNewSearch) {
         _hasSearched = true;
         _currentPage = 1;
-        _pageCache.clear();
-        _totalResults = 0;
-        _hasMoreResults = true;
-        _lastLostDoc = null;
-        _lastFoundDoc = null;
+        _allResults.clear();
       }
     });
 
     try {
-      await _loadPage(_currentPage);
+      await _loadAllResults();
     } catch (e) {
       print('Search error: $e');
       if (mounted) {
@@ -116,24 +110,14 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
     }
   }
 
-  Future<void> _loadPage(int page) async {
-    // Check if page is already cached
-    if (_pageCache.containsKey(page)) {
-      setState(() {});
-      return;
-    }
-
+  Future<void> _loadAllResults() async {
     final results = <_SearchResultItem>[];
-
-    // Calculate how many items to skip
-    final itemsToSkip = (page - 1) * _itemsPerPage;
 
     // Search in lost items if needed
     if (_selectedReportType == 'all' || _selectedReportType == 'lost') {
       final lostResults = await _searchInCollection(
         'lost_item_reports',
         'lost',
-        page: page,
       );
       results.addAll(lostResults);
     }
@@ -143,7 +127,6 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       final foundResults = await _searchInCollection(
         'found_item_reports',
         'found',
-        page: page,
       );
       results.addAll(foundResults);
     }
@@ -180,23 +163,14 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
     }
 
     setState(() {
-      _pageCache[page] = results;
-      if (page == 1) {
-        // For first page, estimate total results (we'll know exact count as we paginate)
-        _totalResults = results.length;
-        _hasMoreResults = results.length >= _itemsPerPage;
-      } else {
-        _totalResults = ((page - 1) * _itemsPerPage) + results.length;
-        _hasMoreResults = results.length >= _itemsPerPage;
-      }
+      _allResults = results;
     });
   }
 
   Future<List<_SearchResultItem>> _searchInCollection(
       String collectionName,
-      String reportType, {
-        required int page,
-      }) async {
+      String reportType,
+      ) async {
     Query query = FirebaseFirestore.instance
         .collection(collectionName)
         .where('reportStatus', isEqualTo: 'submitted');
@@ -214,28 +188,13 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           .where(dateField, isLessThanOrEqualTo: Timestamp.fromDate(_endDate!));
     }
 
-    // Apply ordering (required for pagination)
+    // Apply ordering
     query = query.orderBy('createdAt', descending: true);
-
-    // For pages after the first, start after the last document
-    if (page > 1) {
-      // We need to fetch all previous items to know where to start
-      // This is a limitation when using client-side sorting
-      final skipCount = (page - 1) * _itemsPerPage;
-      query = query.limit(skipCount + _itemsPerPage);
-    } else {
-      query = query.limit(_itemsPerPage);
-    }
 
     final snapshot = await query.get();
     final results = <_SearchResultItem>[];
     final searchTerm = _searchController.text.trim().toLowerCase();
 
-    // Calculate start and end indices for this page
-    final startIdx = page > 1 ? (page - 1) * _itemsPerPage : 0;
-    final endIdx = page * _itemsPerPage;
-
-    int currentIdx = 0;
     int processedCount = 0;
 
     for (final doc in snapshot.docs) {
@@ -254,44 +213,34 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
         }
       }
 
-      // Only process items for current page
-      if (currentIdx >= startIdx && currentIdx < endIdx) {
-        // Get thumbnailBytes directly from Firestore
-        Uint8List? thumbnailBytes;
-        final thumbnailBytesData = data['thumbnailBytes'];
-        if (thumbnailBytesData != null) {
-          if (thumbnailBytesData is Uint8List) {
-            thumbnailBytes = thumbnailBytesData;
-          } else if (thumbnailBytesData is List) {
-            thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
-          }
-        }
-
-        results.add(_SearchResultItem(
-          reportId: doc.id,
-          reportType: reportType,
-          itemName: data['itemName'] as String? ?? 'Untitled',
-          category: data['category'] as String? ?? 'Unknown',
-          thumbnailBytes: thumbnailBytes,
-          createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
-        ));
-
-        processedCount++;
-        if (processedCount % 3 == 0) {
-          await Future.delayed(const Duration(milliseconds: 5));
+      // Get thumbnailBytes directly from Firestore
+      Uint8List? thumbnailBytes;
+      final thumbnailBytesData = data['thumbnailBytes'];
+      if (thumbnailBytesData != null) {
+        if (thumbnailBytesData is Uint8List) {
+          thumbnailBytes = thumbnailBytesData;
+        } else if (thumbnailBytesData is List) {
+          thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
         }
       }
 
-      currentIdx++;
+      results.add(_SearchResultItem(
+        reportId: doc.id,
+        reportType: reportType,
+        itemName: data['itemName'] as String? ?? 'Untitled',
+        category: data['category'] as String? ?? 'Unknown',
+        thumbnailBytes: thumbnailBytes,
+        createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      ));
 
-      // Stop if we've processed enough items for this page
-      if (results.length >= _itemsPerPage) break;
+      processedCount++;
+      if (processedCount % 10 == 0) {
+        await Future.delayed(const Duration(milliseconds: 5));
+      }
     }
 
     return results;
   }
-
-
 
   Future<void> _selectDateRange() async {
     final DateTimeRange? picked = await showDateRangePicker(
@@ -332,30 +281,18 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       _startDate = null;
       _endDate = null;
       _searchController.clear();
-      _pageCache.clear();
+      _allResults.clear();
       _hasSearched = false;
       _currentPage = 1;
-      _totalResults = 0;
     });
   }
 
-  Future<void> _goToPage(int page) async {
-    if (page < 1 || (page > _totalPages && !_hasMoreResults)) return;
+  void _goToPage(int page) {
+    if (page < 1 || page > _totalPages) return;
 
     setState(() {
       _currentPage = page;
     });
-
-    // Load page if not cached
-    if (!_pageCache.containsKey(page)) {
-      setState(() {
-        _isSearching = true;
-      });
-      await _loadPage(page);
-      setState(() {
-        _isSearching = false;
-      });
-    }
   }
 
   @override
@@ -796,7 +733,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       );
     }
 
-    if (_isSearching && _currentPage == 1) {
+    if (_isSearching) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -809,9 +746,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       );
     }
 
-    final results = _currentPageResults;
-
-    if (_totalResults == 0) {
+    if (_allResults.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -836,13 +771,15 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       );
     }
 
+    final results = _currentPageResults;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
-            '${_totalResults}+ result${_totalResults == 1 ? '' : 's'} found (Page $_currentPage${_hasMoreResults ? '+' : ' of $_totalPages'})',
+            '${_allResults.length} result${_allResults.length == 1 ? '' : 's'} found (Page $_currentPage of $_totalPages)',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -851,9 +788,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           ),
         ),
         Expanded(
-          child: _isSearching
-              ? const Center(child: CircularProgressIndicator())
-              : ListView.builder(
+          child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: results.length,
             itemBuilder: (context, index) {
@@ -861,7 +796,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
             },
           ),
         ),
-        if (_totalPages > 1 || _hasMoreResults) _buildPagination(),
+        if (_totalPages > 1) _buildPagination(),
       ],
     );
   }
@@ -892,7 +827,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.chevron_right),
-            onPressed: (_hasMoreResults || _currentPage < _totalPages)
+            onPressed: _currentPage < _totalPages
                 ? () => _goToPage(_currentPage + 1)
                 : null,
             color: Colors.indigo.shade700,
@@ -904,9 +839,8 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
 
   List<Widget> _buildPageNumbers() {
     List<Widget> pageButtons = [];
-    final maxPages = _hasMoreResults ? _currentPage + 2 : _totalPages;
-    int start = (_currentPage - 2).clamp(1, maxPages);
-    int end = (_currentPage + 2).clamp(1, maxPages);
+    int start = (_currentPage - 2).clamp(1, _totalPages);
+    int end = (_currentPage + 2).clamp(1, _totalPages);
 
     if (start > 1) {
       pageButtons.add(_buildPageButton(1));
@@ -919,9 +853,7 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       pageButtons.add(_buildPageButton(i));
     }
 
-    if (_hasMoreResults && end == _currentPage + 2) {
-      pageButtons.add(Text('...', style: TextStyle(color: Colors.grey.shade600)));
-    } else if (end < _totalPages) {
+    if (end < _totalPages) {
       if (end < _totalPages - 1) {
         pageButtons.add(Text('...', style: TextStyle(color: Colors.grey.shade600)));
       }

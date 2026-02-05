@@ -35,7 +35,7 @@ class ReportHistoryPage extends StatefulWidget {
 class _ReportHistoryPageState extends State<ReportHistoryPage> {
   String _selectedTab = 'lost';
 
-  // Data for each tab
+  // All data loaded at once for each tab
   List<_HistoryItem>? _lostReports;
   List<_HistoryItem>? _foundReports;
   List<_HistoryItem>? _claimReports;
@@ -48,13 +48,13 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
   bool _foundError = false;
   bool _claimsError = false;
 
-  // Pagination
+  // Pagination - only for display
   int _lostCurrentPage = 1;
   int _foundCurrentPage = 1;
   int _claimsCurrentPage = 1;
   final int _itemsPerPage = 10;
 
-  // Total pages
+  // Total pages calculation
   int get _lostTotalPages {
     if (_lostReports == null || _lostReports!.isEmpty) return 0;
     return ((_lostReports!.length - 1) ~/ _itemsPerPage) + 1;
@@ -70,7 +70,7 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
     return ((_claimReports!.length - 1) ~/ _itemsPerPage) + 1;
   }
 
-  // Paginated results
+  // Paginated results for display only
   List<_HistoryItem> get _lostPaginatedResults {
     if (_lostReports == null) return [];
     final startIndex = (_lostCurrentPage - 1) * _itemsPerPage;
@@ -101,7 +101,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
     _loadLostReports();
   }
 
-
   Future<void> _loadLostReports() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -109,12 +108,12 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
     if (mounted) setState(() { _isLoadingLost = true; _lostError = false; });
 
     try {
+      // Load all lost reports at once
       final snapshot = await FirebaseFirestore.instance
           .collection('lost_item_reports')
           .where('userId', isEqualTo: user.uid)
           .where('reportStatus', isEqualTo: 'submitted')
           .orderBy('createdAt', descending: true)
-          .limit(100)  // Increased limit to allow more pagination
           .get();
 
       final List<_HistoryItem> items = [];
@@ -131,8 +130,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
           }
         }
 
-        // Thumbnail is now loaded directly from Firestore
-
         items.add(_HistoryItem(
           reportId: doc.id,
           itemName: data['itemName'] ?? 'Untitled',
@@ -146,7 +143,7 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
       if (mounted) setState(() {
         _lostReports = items;
         _isLoadingLost = false;
-        _lostCurrentPage = 1; // Reset to page 1
+        _lostCurrentPage = 1;
       });
     } catch (e) {
       if (mounted) setState(() {
@@ -163,12 +160,12 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
     if (mounted) setState(() { _isLoadingFound = true; _foundError = false; });
 
     try {
+      // Load all found reports at once
       final snapshot = await FirebaseFirestore.instance
           .collection('found_item_reports')
           .where('userId', isEqualTo: user.uid)
           .where('reportStatus', isEqualTo: 'submitted')
           .orderBy('createdAt', descending: true)
-          .limit(100)
           .get();
 
       final List<_HistoryItem> items = [];
@@ -184,8 +181,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
             thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
           }
         }
-
-        // Thumbnail is now loaded directly from Firestore
 
         items.add(_HistoryItem(
           reportId: doc.id,
@@ -217,11 +212,11 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
     if (mounted) setState(() { _isLoadingClaims = true; _claimsError = false; });
 
     try {
+      // Load all claim reports at once
       final snapshot = await FirebaseFirestore.instance
           .collection('lost_item_claims')
           .where('userId', isEqualTo: user.uid)
           .orderBy('createdAt', descending: true)
-          .limit(100)
           .get();
 
       final List<_HistoryItem> items = [];
@@ -246,7 +241,6 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
               itemName = foundData['itemName'] ?? itemName;
               category = foundData['category'] ?? category;
 
-              // Get thumbnailBytes from found report
               final thumbnailBytesData = foundData['thumbnailBytes'];
               if (thumbnailBytesData != null) {
                 if (thumbnailBytesData is Uint8List) {
