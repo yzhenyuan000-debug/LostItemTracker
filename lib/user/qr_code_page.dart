@@ -383,7 +383,7 @@ class _QRCodePageState extends State<QRCodePage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Scan this code to view my contact info',
+                                'Scan this code in TARUMT Lost Item Tracker app to view my contact info',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.indigo.shade700,
