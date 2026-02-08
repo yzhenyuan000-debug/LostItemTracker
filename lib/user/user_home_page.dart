@@ -179,6 +179,7 @@ class _UserHomePageState extends State<UserHomePage> {
       final snapshot = await FirebaseFirestore.instance
           .collection('lost_item_reports')
           .where('reportStatus', isEqualTo: 'submitted')
+          .where('itemReturnStatus', isEqualTo: 'pending')
           .orderBy('createdAt', descending: true)
           .limit(8)
           .get();
@@ -220,6 +221,7 @@ class _UserHomePageState extends State<UserHomePage> {
       final snapshot = await FirebaseFirestore.instance
           .collection('found_item_reports')
           .where('reportStatus', isEqualTo: 'submitted')
+          .where('itemReturnStatus', isEqualTo: 'pending')
           .orderBy('createdAt', descending: true)
           .limit(8)
           .get();

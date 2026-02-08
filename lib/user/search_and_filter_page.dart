@@ -173,7 +173,8 @@ class _SearchAndFilterPageState extends State<SearchAndFilterPage> {
       ) async {
     Query query = FirebaseFirestore.instance
         .collection(collectionName)
-        .where('reportStatus', isEqualTo: 'submitted');
+        .where('reportStatus', isEqualTo: 'submitted')
+        .where('itemReturnStatus', isEqualTo: 'pending');
 
     // Apply category filter
     if (_selectedCategories.isNotEmpty) {
