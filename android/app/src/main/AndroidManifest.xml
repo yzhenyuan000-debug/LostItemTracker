@@ -16,6 +16,20 @@
     <!-- Internet for Firebase -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <queries>
+        <!-- Email -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+
+        <!-- Phone -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+    </queries>
+
     <application
         android:label="lost_item_tracker"
         android:name="${applicationName}"
