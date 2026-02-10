@@ -13,6 +13,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'search_and_filter_page.dart';
 import 'qr_code_page.dart';
+import 'help_and_feedback_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -987,14 +988,15 @@ class _UserHomePageState extends State<UserHomePage> {
                     },
                   ),
                   _buildDrawerMenuItem(
-                    icon: Icons.settings_outlined,
-                    title: 'Settings',
-                    onTap: () {
+                    icon: Icons.help_outline,
+                    title: 'Help & Feedback',
+                    onTap: () async {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Settings page coming soon'),
-                          behavior: SnackBarBehavior.floating,
+                      await Future.delayed(const Duration(milliseconds: 150));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HelpAndFeedbackPage(),
                         ),
                       );
                     },
