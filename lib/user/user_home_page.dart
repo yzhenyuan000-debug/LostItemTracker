@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'user_login_page.dart';
 import 'report_type_selection_page.dart';
 import 'campus_map_page.dart';
 import 'user_profile_page.dart';
@@ -14,6 +13,7 @@ import 'dart:ui' as ui;
 import 'search_and_filter_page.dart';
 import 'qr_code_page.dart';
 import 'help_and_feedback_page.dart';
+import 'package:lost_item_tracker_client/role_selection_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -105,7 +105,7 @@ class _UserHomePageState extends State<UserHomePage> {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const UserLoginPage(),
+                  builder: (context) => const RoleSelectionPage(),
                 ),
                     (route) => false,
               );
