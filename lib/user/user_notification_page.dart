@@ -4,6 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'lost_item_report.dart';
 import 'found_item_report.dart';
+import 'user_home_page.dart';
+import 'search_and_filter_page.dart';
+import 'user_profile_page.dart';
 
 class UserNotificationPage extends StatefulWidget {
   const UserNotificationPage({super.key});
@@ -220,6 +223,7 @@ class _UserNotificationPageState extends State<UserNotificationPage> {
           );
         },
       ),
+      bottomNavigationBar: _buildBottomAppBar(context),
     );
   }
 
@@ -740,6 +744,78 @@ class _UserNotificationPageState extends State<UserNotificationPage> {
               foregroundColor: Colors.white,
             ),
             child: const Text('View Item'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== BOTTOM NAVIGATION ====================
+  Widget _buildBottomAppBar(BuildContext context) {
+    return BottomAppBar(
+      shape: const CircularNotchedRectangle(),
+      notchMargin: 8.0,
+      child: SizedBox(
+        height: 40,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(context, Icons.home, 'Home'),
+            _buildNavItem(context, Icons.search, 'Search'),
+            const SizedBox(width: 40), // Space for FAB on home page
+            _buildNavItem(context, Icons.notifications_outlined, 'Notification'),
+            _buildNavItem(context, Icons.person, 'Account'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(BuildContext context, IconData icon, String label) {
+    final bool isSelected = label == 'Notification';
+    return InkWell(
+      onTap: () {
+        if (label == 'Home') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const UserHomePage(),
+            ),
+          );
+        } else if (label == 'Search') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SearchAndFilterPage(),
+            ),
+          );
+        } else if (label == 'Notification') {
+          // Already on notification page, do nothing
+        } else if (label == 'Account') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const UserProfilePage(),
+            ),
+          );
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade500,
+            size: 24,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: isSelected ? Colors.indigo.shade700 : Colors.grey.shade500,
+            ),
           ),
         ],
       ),

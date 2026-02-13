@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'lost_item_reporting_page.dart';
 import 'found_item_reporting_page.dart';
 import 'draft_report_listing_page.dart';
+import 'user_home_page.dart';
+import 'search_and_filter_page.dart';
+import 'user_notification_page.dart';
+import 'user_profile_page.dart';
 
 class ReportTypeSelectionPage extends StatelessWidget {
   const ReportTypeSelectionPage({super.key});
@@ -218,18 +222,35 @@ class ReportTypeSelectionPage extends StatelessWidget {
     return InkWell(
       onTap: () {
         if (label == 'Home') {
-          Navigator.pop(context);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Navigation to $label coming soon'),
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.only(
-                left: 16,
-                right: 16,
-                bottom: 1,
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const UserHomePage(),
               ),
-              duration: const Duration(seconds: 2),
+            );
+          }
+        } else if (label == 'Search') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SearchAndFilterPage(),
+            ),
+          );
+        } else if (label == 'Notification') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const UserNotificationPage(),
+            ),
+          );
+        } else if (label == 'Account') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const UserProfilePage(),
             ),
           );
         }

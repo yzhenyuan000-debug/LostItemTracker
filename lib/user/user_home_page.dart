@@ -14,6 +14,7 @@ import 'search_and_filter_page.dart';
 import 'qr_code_page.dart';
 import 'help_and_feedback_page.dart';
 import 'package:lost_item_tracker_client/role_selection_page.dart';
+import 'user_reward_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -964,12 +965,13 @@ class _UserHomePageState extends State<UserHomePage> {
                   _buildDrawerMenuItem(
                     icon: Icons.card_giftcard,
                     title: 'Rewards',
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Rewards page coming soon'),
-                          behavior: SnackBarBehavior.floating,
+                      await Future.delayed(const Duration(milliseconds: 150));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UserRewardPage(),
                         ),
                       );
                     },
