@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'voucher_qr_code_page.dart';
 
 class UserVoucherPage extends StatefulWidget {
   const UserVoucherPage({super.key});
@@ -111,6 +112,27 @@ class _MyVouchersTab extends StatelessWidget {
 
   const _MyVouchersTab({required this.userId});
 
+  /// Check if voucher is expired and update status automatically
+  Future<void> _checkAndUpdateExpiredVoucher(
+      String voucherId,
+      DateTime expiryDate,
+      String currentStatus,
+      ) async {
+    if (currentStatus != 'active') return;
+
+    final now = DateTime.now();
+    if (now.isAfter(expiryDate)) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('user_vouchers')
+            .doc(voucherId)
+            .update({'status': 'expired'});
+      } catch (e) {
+        print('Error updating expired voucher: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
@@ -204,7 +226,7 @@ class _MyVouchersTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'View vouchers you have redeemed.',
+                    'View vouchers you have redeemed. Tap to show QR code.',
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey.shade600,
@@ -215,128 +237,250 @@ class _MyVouchersTab extends StatelessWidget {
               );
             }
 
-            final data = docs[index - 1].data() as Map<String, dynamic>;
+            final doc = docs[index - 1];
+            final data = doc.data() as Map<String, dynamic>;
+            final String voucherId = doc.id;
             final String name = data['voucherName'] as String? ?? 'Voucher';
             final String description =
                 data['voucherDescription'] as String? ?? '';
             final String status = data['status'] as String? ?? 'active';
-            final Timestamp? ts = data['redeemedAt'] as Timestamp?;
-            final DateTime? redeemedAt = ts?.toDate();
+            final Timestamp? redeemedTs = data['redeemedAt'] as Timestamp?;
+            final DateTime? redeemedAt = redeemedTs?.toDate();
+            final Timestamp? expiryTs = data['expiryDate'] as Timestamp?;
+            final DateTime? expiryDate = expiryTs?.toDate();
+
+            // Auto-check and update expired status
+            if (expiryDate != null) {
+              _checkAndUpdateExpiredVoucher(voucherId, expiryDate, status);
+            }
 
             Color statusColor;
             String statusLabel;
+            IconData statusIcon;
+
             if (status == 'used') {
               statusColor = Colors.grey.shade600;
               statusLabel = 'Used';
+              statusIcon = Icons.check_circle;
             } else if (status == 'expired') {
               statusColor = Colors.red.shade600;
               statusLabel = 'Expired';
+              statusIcon = Icons.cancel;
             } else {
               statusColor = Colors.green.shade700;
               statusLabel = 'Active';
+              statusIcon = Icons.check_circle_outline;
             }
 
-            return Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.shade100,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.local_offer,
-                      color: Colors.indigo.shade700,
-                      size: 24,
+            // Check if expired (real-time check)
+            final bool isExpired = expiryDate != null &&
+                DateTime.now().isAfter(expiryDate);
+
+            return InkWell(
+              onTap: status == 'active' && !isExpired
+                  ? () {
+                // Navigate to QR code page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VoucherQRCodePage(
+                      voucherId: voucherId,
+                      voucherName: name,
+                      voucherDescription: description,
+                      expiryDate: expiryDate,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                        if (description.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                );
+              }
+                  : null,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: status == 'active' && !isExpired
+                        ? Colors.indigo.shade200
+                        : Colors.grey.shade200,
+                    width: status == 'active' && !isExpired ? 2 : 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.shade100,
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: status == 'active' && !isExpired
+                            ? Colors.indigo.shade50
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.local_offer,
+                        color: status == 'active' && !isExpired
+                            ? Colors.indigo.shade700
+                            : Colors.grey.shade400,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            description,
+                            name,
                             style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade800,
                             ),
                           ),
-                        ],
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                          if (description.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              description,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
                               ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                statusLabel,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          // Status Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  statusIcon,
+                                  size: 14,
                                   color: statusColor,
                                 ),
-                              ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  statusLabel,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: statusColor,
+                                  ),
+                                ),
+                              ],
                             ),
-                            if (redeemedAt != null) ...[
-                              const SizedBox(width: 8),
-                              Icon(
-                                Icons.access_time,
-                                size: 14,
-                                color: Colors.grey.shade500,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatShortDateTime(redeemedAt),
-                                style: TextStyle(
-                                  fontSize: 11,
+                          ),
+                          const SizedBox(height: 8),
+                          // Expiry Date
+                          if (expiryDate != null) ...[
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.schedule,
+                                  size: 14,
+                                  color: isExpired
+                                      ? Colors.red.shade600
+                                      : Colors.grey.shade500,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isExpired
+                                      ? 'Expired on ${_formatDate(expiryDate)}'
+                                      : 'Valid until ${_formatDate(expiryDate)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isExpired
+                                        ? Colors.red.shade600
+                                        : Colors.grey.shade500,
+                                    fontWeight: isExpired
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          // Redeemed Date
+                          if (redeemedAt != null) ...[
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time,
+                                  size: 14,
                                   color: Colors.grey.shade500,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Redeemed ${_formatShortDateTime(redeemedAt)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
-                        ),
-                      ],
+                          // Tap to show QR hint
+                          if (status == 'active' && !isExpired) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.qr_code,
+                                  size: 14,
+                                  color: Colors.indigo.shade700,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Tap to show QR code',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.indigo.shade700,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    if (status == 'active' && !isExpired)
+                      Icon(
+                        Icons.chevron_right,
+                        color: Colors.indigo.shade700,
+                      ),
+                  ],
+                ),
               ),
             );
           },
         );
       },
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
   }
 }
 
@@ -458,6 +602,8 @@ class _VoucherStoreTab extends StatelessWidget {
                 data['description'] as String? ?? '';
             final int requiredPoints =
                 (data['requiredPoints'] as num?)?.toInt() ?? 0;
+            final int validityDays =
+                (data['validityDays'] as num?)?.toInt() ?? 30;
 
             return _VoucherCard(
               userId: userId,
@@ -465,6 +611,7 @@ class _VoucherStoreTab extends StatelessWidget {
               name: name,
               description: description,
               requiredPoints: requiredPoints,
+              validityDays: validityDays,
             );
           },
         );
@@ -481,6 +628,7 @@ class _VoucherCard extends StatelessWidget {
   final String name;
   final String description;
   final int requiredPoints;
+  final int validityDays;
 
   const _VoucherCard({
     required this.userId,
@@ -488,6 +636,7 @@ class _VoucherCard extends StatelessWidget {
     required this.name,
     required this.description,
     required this.requiredPoints,
+    required this.validityDays,
   });
 
   @override
@@ -520,141 +669,205 @@ class _VoucherCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.local_offer,
-                  color: Colors.orange.shade700,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
-                      ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    Row(
+                    child: Icon(
+                      Icons.local_offer,
+                      color: Colors.orange.shade700,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.stars,
-                            size: 16, color: Colors.amber.shade700),
-                        const SizedBox(width: 4),
                         Text(
-                          '$requiredPoints pts',
+                          name,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: Colors.grey.shade800,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '(You have $currentPoints pts)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade500,
+                        if (description.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            description,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
+                        ],
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.stars,
+                                size: 16, color: Colors.amber.shade700),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$requiredPoints pts',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '(You have $currentPoints pts)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        // Validity period
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.schedule,
+                              size: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Valid for $validityDays days',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: canRedeem
-                    ? () async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Redeem Voucher'),
-                            content: Text(
-                              'Redeem "$name" for $requiredPoints points?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () =>
-                                    Navigator.of(context).pop(false),
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () =>
-                                    Navigator.of(context).pop(true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo.shade700,
-                                  foregroundColor: Colors.white,
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: canRedeem
+                      ? () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Redeem Voucher'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Redeem "$name" for $requiredPoints points?'),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.orange.shade200,
                                 ),
-                                child: const Text('Redeem'),
                               ),
-                            ],
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 16,
+                                    color: Colors.orange.shade700,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Valid for $validityDays days from redemption',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.orange.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.of(context).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () =>
+                                Navigator.of(context).pop(true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.indigo.shade700,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Redeem'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirmed != true) return;
+
+                    try {
+                      await RewardService.redeemVoucher(
+                        userId: userId,
+                        voucherDoc: voucherDoc,
+                        validityDays: validityDays,
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Voucher "$name" redeemed!'),
+                            backgroundColor: Colors.green,
                           ),
                         );
-
-                        if (confirmed != true) return;
-
-                        try {
-                          await RewardService.redeemVoucher(
-                            userId: userId,
-                            voucherDoc: voucherDoc,
-                          );
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Voucher "$name" redeemed!'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          final message = e is RewardServiceException &&
-                                  e.code ==
-                                      RewardServiceErrorCode.notEnoughPoints
-                              ? 'Not enough points to redeem this voucher.'
-                              : 'Failed to redeem voucher: ${e.toString()}';
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(message),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
                       }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo.shade700,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-                child: const Text(
-                  'Redeem',
-                  style: TextStyle(fontSize: 12),
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      final message = e is RewardServiceException &&
+                          e.code ==
+                              RewardServiceErrorCode.notEnoughPoints
+                          ? 'Not enough points to redeem this voucher.'
+                          : 'Failed to redeem voucher: ${e.toString()}';
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(message),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Redeem',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -688,6 +901,7 @@ class RewardService {
   static Future<void> redeemVoucher({
     required String userId,
     required DocumentSnapshot voucherDoc,
+    required int validityDays,
   }) async {
     final Map<String, dynamic> voucherData =
         voucherDoc.data() as Map<String, dynamic>? ?? {};
@@ -705,12 +919,16 @@ class RewardService {
     final String description =
         voucherData['description'] as String? ?? '';
 
+    // Calculate expiry date
+    final now = DateTime.now();
+    final expiryDate = now.add(Duration(days: validityDays));
+
     final DocumentReference userRewardsRef =
-        _firestore.collection('user_rewards').doc(userId);
+    _firestore.collection('user_rewards').doc(userId);
     final DocumentReference userVoucherRef =
-        _firestore.collection('user_vouchers').doc();
+    _firestore.collection('user_vouchers').doc();
     final DocumentReference activityRef =
-        _firestore.collection('user_reward_activities').doc();
+    _firestore.collection('user_reward_activities').doc();
 
     await _firestore.runTransaction((transaction) async {
       final userRewardsSnap = await transaction.get(userRewardsRef);
@@ -747,9 +965,9 @@ class RewardService {
           'lifetimePoints': lifetimePoints,
           'updatedAt': FieldValue.serverTimestamp(),
           'createdAt':
-              userRewardsSnap.exists && existingCreatedAt != null
-                  ? existingCreatedAt
-                  : FieldValue.serverTimestamp(),
+          userRewardsSnap.exists && existingCreatedAt != null
+              ? existingCreatedAt
+              : FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
       );
@@ -762,6 +980,7 @@ class RewardService {
         'requiredPoints': requiredPoints,
         'status': 'active',
         'redeemedAt': FieldValue.serverTimestamp(),
+        'expiryDate': Timestamp.fromDate(expiryDate), // Add expiry date
       });
 
       transaction.set(activityRef, {
@@ -824,4 +1043,3 @@ String _formatShortDateTime(DateTime dateTime) {
         '${dateTime.day.toString().padLeft(2, '0')}';
   }
 }
-
