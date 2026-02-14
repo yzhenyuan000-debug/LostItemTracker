@@ -527,7 +527,7 @@ class _UserRewardPageState extends State<UserRewardPage> {
               .collection('user_reward_activities')
               .where('userId', isEqualTo: userId)
               .orderBy('createdAt', descending: true)
-              .limit(20)
+              .limit(5)
               .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
