@@ -12,6 +12,158 @@ class UserRewardPage extends StatefulWidget {
 
 class _UserRewardPageState extends State<UserRewardPage> {
   final User? _currentUser = FirebaseAuth.instance.currentUser;
+  bool _isCalculatingPoints = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateAndAwardPoints();
+  }
+
+  /// Scan Firestore for unrewarded activities and award points automatically
+  Future<void> _calculateAndAwardPoints() async {
+    if (_currentUser == null) return;
+
+    setState(() {
+      _isCalculatingPoints = true;
+    });
+
+    try {
+      final userId = _currentUser!.uid;
+
+      // 1. Award points for submitted lost item reports
+      await _awardPointsForLostItems(userId);
+
+      // 2. Award points for submitted found item reports
+      await _awardPointsForFoundItems(userId);
+
+      // 3. Award points for claimed found items
+      await _awardPointsForClaimedItems(userId);
+
+      // 4. Award points for user feedback
+      await _awardPointsForFeedback(userId);
+
+    } catch (e) {
+      print('Error calculating points: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCalculatingPoints = false;
+        });
+      }
+    }
+  }
+
+  /// Award +5 points for each submitted lost item report
+  Future<void> _awardPointsForLostItems(String userId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('lost_item_reports')
+        .where('userId', isEqualTo: userId)
+        .where('reportStatus', isEqualTo: 'submitted')
+        .where('pointsAwarded', isEqualTo: false)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      try {
+        await RewardService.addPointsForEvent(
+          userId: userId,
+          pointsDelta: 5,
+          title: 'Lost item reported',
+          description: 'You reported a lost item: ${doc.data()['itemName'] ?? 'Item'}',
+          type: 'lost_item_reported',
+          relatedId: doc.id,
+        );
+
+        // Mark as awarded to prevent double-counting
+        await doc.reference.update({'pointsAwarded': true});
+      } catch (e) {
+        print('Error awarding points for lost item ${doc.id}: $e');
+      }
+    }
+  }
+
+  /// Award +10 points for each submitted found item report
+  Future<void> _awardPointsForFoundItems(String userId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('found_item_reports')
+        .where('userId', isEqualTo: userId)
+        .where('reportStatus', isEqualTo: 'submitted')
+        .where('pointsAwarded', isEqualTo: false)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      try {
+        await RewardService.addPointsForEvent(
+          userId: userId,
+          pointsDelta: 10,
+          title: 'Found item reported',
+          description: 'You reported a found item: ${doc.data()['itemName'] ?? 'Item'}',
+          type: 'found_item_reported',
+          relatedId: doc.id,
+        );
+
+        // Mark as awarded to prevent double-counting
+        await doc.reference.update({'pointsAwarded': true});
+      } catch (e) {
+        print('Error awarding points for found item ${doc.id}: $e');
+      }
+    }
+  }
+
+  /// Award +30 points for each claimed found item (successful return)
+  Future<void> _awardPointsForClaimedItems(String userId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('found_item_reports')
+        .where('userId', isEqualTo: userId)
+        .where('itemReturnStatus', isEqualTo: 'claimed')
+        .where('claimPointsAwarded', isEqualTo: false)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      try {
+        await RewardService.addPointsForEvent(
+          userId: userId,
+          pointsDelta: 30,
+          title: 'Item successfully returned',
+          description: 'Your found item was claimed: ${doc.data()['itemName'] ?? 'Item'}',
+          type: 'item_claimed_success',
+          relatedId: doc.id,
+        );
+
+        // Mark as awarded to prevent double-counting
+        await doc.reference.update({'claimPointsAwarded': true});
+      } catch (e) {
+        print('Error awarding points for claimed item ${doc.id}: $e');
+      }
+    }
+  }
+
+  /// Award +3 points for each user feedback submission
+  Future<void> _awardPointsForFeedback(String userId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('user_feedback')
+        .where('userId', isEqualTo: userId)
+        .where('pointsAwarded', isEqualTo: false)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      try {
+        await RewardService.addPointsForEvent(
+          userId: userId,
+          pointsDelta: 3,
+          title: 'Feedback submitted',
+          description: 'Thank you for your feedback: ${doc.data()['category'] ?? 'Feedback'}',
+          type: 'feedback_submitted',
+          relatedId: doc.id,
+        );
+
+        // Mark as awarded to prevent double-counting
+        await doc.reference.update({'pointsAwarded': true});
+      } catch (e) {
+        print('Error awarding points for feedback ${doc.id}: $e');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +187,24 @@ class _UserRewardPageState extends State<UserRewardPage> {
         title: const Text('Rewards'),
         backgroundColor: Colors.indigo.shade700,
         foregroundColor: Colors.white,
+        actions: [
+          if (_isCalculatingPoints)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          // Firestore streams will auto-update; small delay to show indicator
+          await _calculateAndAwardPoints();
           await Future.delayed(const Duration(milliseconds: 500));
         },
         child: SingleChildScrollView(
@@ -47,8 +213,50 @@ class _UserRewardPageState extends State<UserRewardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Points calculation info banner
+              if (_isCalculatingPoints)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Calculating your points from activities...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               _buildPointsSection(userId),
               const SizedBox(height: 20),
+
+              // Points earning guide
+              _buildPointsGuideSection(),
+              const SizedBox(height: 20),
+
               _buildRecentActivitySection(userId),
               const SizedBox(height: 20),
               _buildBadgesSection(userId),
@@ -89,6 +297,72 @@ class _UserRewardPageState extends State<UserRewardPage> {
           ),
         ),
       ),
+    );
+  }
+
+  // ==================== POINTS EARNING GUIDE ====================
+  Widget _buildPointsGuideSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: Colors.amber.shade700, size: 24),
+              const SizedBox(width: 10),
+              Text(
+                'How to Earn Points',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildPointGuideRow(Icons.search_off, 'Report a lost item', '+5 pts'),
+          const SizedBox(height: 8),
+          _buildPointGuideRow(Icons.inventory_2, 'Report a found item', '+10 pts'),
+          const SizedBox(height: 8),
+          _buildPointGuideRow(Icons.check_circle, 'Item successfully returned', '+30 pts'),
+          const SizedBox(height: 8),
+          _buildPointGuideRow(Icons.feedback, 'Submit feedback', '+3 pts'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPointGuideRow(IconData icon, String text, String points) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.grey.shade600),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ),
+        Text(
+          points,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: Colors.green.shade700,
+          ),
+        ),
+      ],
     );
   }
 
@@ -206,10 +480,10 @@ class _UserRewardPageState extends State<UserRewardPage> {
 
   String _buildNextBadgeHint(int lifetimePoints) {
     const badgeThresholds = [
+      50,
       100,
       300,
       600,
-      1000,
     ];
     for (final threshold in badgeThresholds) {
       if (lifetimePoints < threshold) {
@@ -323,7 +597,7 @@ class _UserRewardPageState extends State<UserRewardPage> {
 
                   final bool isPositive = delta >= 0;
                   final Color deltaColor =
-                      isPositive ? Colors.green.shade700 : Colors.red.shade700;
+                  isPositive ? Colors.green.shade700 : Colors.red.shade700;
 
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(
@@ -332,7 +606,7 @@ class _UserRewardPageState extends State<UserRewardPage> {
                     ),
                     leading: CircleAvatar(
                       backgroundColor:
-                          isPositive ? Colors.green.shade50 : Colors.red.shade50,
+                      isPositive ? Colors.green.shade50 : Colors.red.shade50,
                       child: Icon(
                         isPositive ? Icons.arrow_upward : Icons.arrow_downward,
                         color: deltaColor,
@@ -452,33 +726,33 @@ class _UserRewardPageState extends State<UserRewardPage> {
             const SizedBox(height: 12),
             badges.isEmpty
                 ? Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'No badges defined yet.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  )
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'No badges defined yet.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            )
                 : SizedBox(
-                    height: 150,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: badges.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        final badge = badges[index];
-                        final bool isUnlocked =
-                            lifetimePoints >= badge.requiredPoints;
-                        return _buildBadgeCard(badge, isUnlocked);
-                      },
-                    ),
-                  ),
+              height: 150,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: badges.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final badge = badges[index];
+                  final bool isUnlocked =
+                      lifetimePoints >= badge.requiredPoints;
+                  return _buildBadgeCard(badge, isUnlocked);
+                },
+              ),
+            ),
           ],
         );
       },
@@ -520,9 +794,9 @@ class _UserRewardPageState extends State<UserRewardPage> {
 
   Widget _buildBadgeCard(_BadgeDefinition badge, bool isUnlocked) {
     final Color activeColor =
-        isUnlocked ? Colors.indigo.shade700 : Colors.grey.shade400;
+    isUnlocked ? Colors.indigo.shade700 : Colors.grey.shade400;
     final Color bgColor =
-        isUnlocked ? Colors.indigo.shade50 : Colors.grey.shade100;
+    isUnlocked ? Colors.indigo.shade50 : Colors.grey.shade100;
 
     return Container(
       width: 140,
@@ -657,11 +931,11 @@ class RewardService {
         voucherData['description'] as String? ?? '';
 
     final DocumentReference userRewardsRef =
-        _firestore.collection('user_rewards').doc(userId);
+    _firestore.collection('user_rewards').doc(userId);
     final DocumentReference userVoucherRef =
-        _firestore.collection('user_vouchers').doc();
+    _firestore.collection('user_vouchers').doc();
     final DocumentReference activityRef =
-        _firestore.collection('user_reward_activities').doc();
+    _firestore.collection('user_reward_activities').doc();
 
     await _firestore.runTransaction((transaction) async {
       final userRewardsSnap = await transaction.get(userRewardsRef);
@@ -699,9 +973,9 @@ class RewardService {
           'lifetimePoints': lifetimePoints,
           'updatedAt': FieldValue.serverTimestamp(),
           'createdAt':
-              userRewardsSnap.exists && existingCreatedAt != null
-                  ? existingCreatedAt
-                  : FieldValue.serverTimestamp(),
+          userRewardsSnap.exists && existingCreatedAt != null
+              ? existingCreatedAt
+              : FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
       );
@@ -752,9 +1026,9 @@ class RewardService {
     String? relatedId,
   }) async {
     final DocumentReference userRewardsRef =
-        _firestore.collection('user_rewards').doc(userId);
+    _firestore.collection('user_rewards').doc(userId);
     final DocumentReference activityRef =
-        _firestore.collection('user_reward_activities').doc();
+    _firestore.collection('user_reward_activities').doc();
 
     await _firestore.runTransaction((transaction) async {
       final userRewardsSnap = await transaction.get(userRewardsRef);
@@ -786,9 +1060,9 @@ class RewardService {
           'lifetimePoints': newLifetimePoints.clamp(0, 1 << 31),
           'updatedAt': FieldValue.serverTimestamp(),
           'createdAt':
-              userRewardsSnap.exists && existingCreatedAt != null
-                  ? existingCreatedAt
-                  : FieldValue.serverTimestamp(),
+          userRewardsSnap.exists && existingCreatedAt != null
+              ? existingCreatedAt
+              : FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
       );
@@ -821,4 +1095,3 @@ class _BadgeDefinition {
     required this.icon,
   });
 }
-

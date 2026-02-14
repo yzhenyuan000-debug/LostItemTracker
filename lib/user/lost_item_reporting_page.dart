@@ -624,6 +624,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         'lostDateTime': Timestamp.fromDate(_lostDateTime!),
         'reportStatus': 'submitted',
         'itemReturnStatus': 'pending',
+        'pointsAwarded': false,
         'createdAt': FieldValue.serverTimestamp(),
       };
 
@@ -663,6 +664,7 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
           'lostDateTime': Timestamp.fromDate(_lostDateTime!),
           'reportStatus': 'submitted', // Changed from 'draft' to 'submitted'
           'itemReturnStatus': 'pending',
+          'pointsAwarded': false,
           'updatedAt': FieldValue.serverTimestamp(),
         });
 

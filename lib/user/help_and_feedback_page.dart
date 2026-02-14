@@ -86,6 +86,7 @@ class _HelpAndFeedbackPageState extends State<HelpAndFeedbackPage>
         'feedback': _feedbackController.text.trim(),
         'createdAt': FieldValue.serverTimestamp(),
         'status': 'pending',
+        'pointsAwarded': false,
       });
 
       if (mounted) {

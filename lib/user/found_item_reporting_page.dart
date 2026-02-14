@@ -687,6 +687,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         'reportStatus': 'submitted',
         'itemReturnStatus': 'pending',
         'foundItemDropOffStatus': 'pending',
+        'pointsAwarded': false,
+        'claimPointsAwarded': false,
         'createdAt': FieldValue.serverTimestamp(),
       };
 
@@ -725,6 +727,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
           'reportStatus': 'submitted',
           'itemReturnStatus': 'pending',
           'foundItemDropOffStatus': 'pending',
+          'pointsAwarded': false,
+          'claimPointsAwarded': false,
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
