@@ -4,11 +4,13 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:typed_data' show Uint8List;
 
@@ -28,11 +30,13 @@ class UserAnalyticalReportPage extends StatefulWidget {
 class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
   final UserAnalyticsService _analyticsService = UserAnalyticsService();
   final User? _user = FirebaseAuth.instance.currentUser;
+  final ScreenshotController _screenshotController = ScreenshotController();
 
   AnalyticsTimeRange _timeRange = AnalyticsTimeRange.month;
   UserAnalyticsReport? _report;
   bool _isLoading = true;
   String? _error;
+  bool _isSavingImage = false;
 
   @override
   void initState() {
@@ -99,36 +103,42 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
         onRefresh: _loadReport,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildTimeRangeSelector(),
-              const SizedBox(height: 20),
-              if (_isLoading)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_error != null)
-                _buildErrorCard()
-              else if (_report != null) ...[
-                _buildSummaryCards(_report!.summary),
-                const SizedBox(height: 24),
-                _buildActivityChart(_report!.activityOverTime),
-                const SizedBox(height: 24),
-                _buildPointsAccumulationChart(_report!.pointsOverTime),
-                const SizedBox(height: 24),
-                _buildCategoryPieCharts(),
-                const SizedBox(height: 24),
-                _buildLocationMap(),
-                const SizedBox(height: 24),
-                _buildClaimOutcomesSection(),
-                const SizedBox(height: 32),
-                _buildDownloadAndShareButtons(),
-                const SizedBox(height: 24),
-              ],
-            ],
+          child: Screenshot(
+            controller: _screenshotController,
+            child: Container(
+              color: Colors.grey.shade50,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildTimeRangeSelector(),
+                  const SizedBox(height: 20),
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_error != null)
+                    _buildErrorCard()
+                  else if (_report != null) ...[
+                      _buildSummaryCards(_report!.summary),
+                      const SizedBox(height: 24),
+                      _buildActivityChart(_report!.activityOverTime),
+                      const SizedBox(height: 24),
+                      _buildPointsAccumulationChart(_report!.pointsOverTime),
+                      const SizedBox(height: 24),
+                      _buildCategoryPieCharts(),
+                      const SizedBox(height: 24),
+                      _buildLocationMap(),
+                      const SizedBox(height: 24),
+                      _buildClaimOutcomesSection(),
+                      const SizedBox(height: 32),
+                      _buildDownloadAndShareButtons(),
+                      const SizedBox(height: 24),
+                    ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -213,6 +223,7 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
           ),
         ),
         const SizedBox(height: 12),
+        // 4 rows x 2 columns layout
         Row(
           children: [
             Expanded(
@@ -232,7 +243,11 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
                 Colors.orange,
               ),
             ),
-            const SizedBox(width: 8),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
             Expanded(
               child: _summaryCard(
                 'Claims Made',
@@ -272,7 +287,11 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
                 Colors.purple,
               ),
             ),
-            const SizedBox(width: 8),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
             Expanded(
               child: _summaryCard(
                 'Feedbacks',
@@ -346,7 +365,7 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
 
     final maxY = points.fold<double>(
       1,
-      (m, p) => (p.total > m ? p.total.toDouble() : m),
+          (m, p) => (p.total > m ? p.total.toDouble() : m),
     );
 
     final barGroups = points.asMap().entries.map((e) {
@@ -494,7 +513,7 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
         FlSpot(e.key.toDouble(), e.value.cumulativePoints.toDouble())).toList();
     final maxY = points.fold<double>(
       0,
-      (m, p) => p.cumulativePoints > m ? p.cumulativePoints.toDouble() : m,
+          (m, p) => p.cumulativePoints > m ? p.cumulativePoints.toDouble() : m,
     );
     return Card(
       elevation: 2,
@@ -637,10 +656,10 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
   }
 
   Widget _buildCategoryPieCard(
-    String title,
-    CategoryCounts categoryCounts,
-    List<Color> colorPalette,
-  ) {
+      String title,
+      CategoryCounts categoryCounts,
+      List<Color> colorPalette,
+      ) {
     final total = categoryCounts.total;
     if (total == 0) {
       return Card(
@@ -788,12 +807,26 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _legendDot(Colors.blue, 'Lost item locations'),
-                  const SizedBox(width: 16),
-                  _legendDot(Colors.orange, 'Found item locations'),
+                  Text(
+                    'Location Patterns',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _legendDot(Colors.blue, 'Lost item locations'),
+                      const SizedBox(width: 16),
+                      _legendDot(Colors.orange, 'Found item locations'),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -899,15 +932,6 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Claim outcomes',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800,
-              ),
-            ),
-            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -978,9 +1002,18 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ElevatedButton.icon(
-          onPressed: _report == null ? null : _downloadReport,
-          icon: const Icon(Icons.download),
-          label: const Text('Download Report'),
+          onPressed: (_report == null || _isSavingImage) ? null : _downloadReportAsImage,
+          icon: _isSavingImage
+              ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          )
+              : const Icon(Icons.download),
+          label: Text(_isSavingImage ? 'Saving...' : 'Download Report'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.indigo.shade700,
             foregroundColor: Colors.white,
@@ -1089,7 +1122,7 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
           pw.SizedBox(height: 16),
           pw.Header(level: 1, child: pw.Text('Activity over time')),
           ...r.activityOverTime.map(
-            (p) => pw.Paragraph(
+                (p) => pw.Paragraph(
               text: '${p.bucket.label}: Lost ${p.lostCount}, Found ${p.foundCount}',
             ),
           ),
@@ -1112,37 +1145,64 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
     ],
   );
 
-  Future<void> _downloadReport() async {
-    final bytes = await _generatePdfBytes();
-    if (bytes == null || bytes.isEmpty) return;
+  /// Download report as a long image and save to gallery using Gal
+  Future<void> _downloadReportAsImage() async {
+    setState(() {
+      _isSavingImage = true;
+    });
+
     try {
-      Directory dir;
-      try {
-        final d = await getDownloadsDirectory();
-        dir = d ?? await getApplicationDocumentsDirectory();
-      } catch (_) {
-        dir = await getApplicationDocumentsDirectory();
+      // Capture screenshot of entire report
+      final Uint8List? imageBytes = await _screenshotController.capture(
+        pixelRatio: 2.0, // High quality
+      );
+
+      if (imageBytes == null) {
+        throw Exception('Failed to capture report screenshot');
       }
-      final name = 'analytics_report_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf';
-      final file = File('${dir.path}/$name');
-      await file.writeAsBytes(bytes);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Report saved: ${file.path}'),
-            behavior: SnackBarBehavior.floating,
+
+      // Check and request permission
+      final hasPermission = await Gal.hasAccess();
+      if (!hasPermission) {
+        final granted = await Gal.requestAccess();
+        if (!granted) {
+          throw Exception('Gallery access permission denied');
+        }
+      }
+
+      // Save to gallery using Gal
+      await Gal.putImageBytes(imageBytes);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(child: Text('Report saved to gallery')),
+            ],
           ),
-        );
-      }
+          backgroundColor: Colors.green.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save report: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        setState(() {
+          _isSavingImage = false;
+        });
       }
     }
   }
@@ -1158,7 +1218,7 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
           children: [
             ListTile(
               leading: const Icon(Icons.share),
-              title: const Text('Share report'),
+              title: const Text('Share as text'),
               onTap: () async {
                 final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(context);
@@ -1180,8 +1240,50 @@ class _UserAnalyticalReportPageState extends State<UserAnalyticalReportPage> {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.image),
+              title: const Text('Share as image'),
+              onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(context);
+                try {
+                  // Capture screenshot
+                  final imageBytes = await _screenshotController.capture(pixelRatio: 2.0);
+                  if (imageBytes == null) {
+                    throw Exception('Failed to capture screenshot');
+                  }
+
+                  // Save to temp directory
+                  final tempDir = await getTemporaryDirectory();
+                  final file = await File('${tempDir.path}/analytics_report_${DateTime.now().millisecondsSinceEpoch}.png')
+                      .create();
+                  await file.writeAsBytes(imageBytes);
+
+                  // Share via system share sheet
+                  await Share.shareXFiles(
+                    [XFile(file.path)],
+                    subject: 'Lost & Found Analytics Report',
+                  );
+
+                  // Clean up temp file
+                  try {
+                    await file.delete();
+                  } catch (_) {
+                    // Ignore cleanup errors
+                  }
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Share failed: $e'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.print),
-              title: const Text('Print'),
+              title: const Text('Print as PDF'),
               onTap: () async {
                 Navigator.pop(context);
                 final bytes = await _generatePdfBytes();
