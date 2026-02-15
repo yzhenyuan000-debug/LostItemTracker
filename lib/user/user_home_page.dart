@@ -15,6 +15,7 @@ import 'qr_code_page.dart';
 import 'help_and_feedback_page.dart';
 import 'package:lost_item_tracker_client/role_selection_page.dart';
 import 'user_reward_page.dart';
+import 'user_analytical_report_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -980,11 +981,11 @@ class _UserHomePageState extends State<UserHomePage> {
                     icon: Icons.analytics_outlined,
                     title: 'Analytics Report',
                     onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Analytics Report page coming soon'),
-                          behavior: SnackBarBehavior.floating,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                          const UserAnalyticalReportPage(),
                         ),
                       );
                     },
