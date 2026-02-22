@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:math' as math;
 
 class HelpAndFeedbackPage extends StatefulWidget {
   const HelpAndFeedbackPage({super.key});
@@ -11,7 +12,7 @@ class HelpAndFeedbackPage extends StatefulWidget {
 }
 
 class _HelpAndFeedbackPageState extends State<HelpAndFeedbackPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _feedbackController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -30,7 +31,7 @@ class _HelpAndFeedbackPageState extends State<HelpAndFeedbackPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this); // Changed from 3 to 4
     _loadUserEmail();
   }
 
@@ -201,10 +202,12 @@ class _HelpAndFeedbackPageState extends State<HelpAndFeedbackPage>
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
+          isScrollable: false, // Make tabs scrollable for 4 tabs
           tabs: const [
             Tab(icon: Icon(Icons.help_outline), text: 'FAQ'),
             Tab(icon: Icon(Icons.feedback_outlined), text: 'Feedback'),
             Tab(icon: Icon(Icons.contact_support), text: 'Contact'),
+            Tab(icon: Icon(Icons.info_outline), text: 'About Us'), // New tab
           ],
         ),
       ),
@@ -214,6 +217,7 @@ class _HelpAndFeedbackPageState extends State<HelpAndFeedbackPage>
           _buildFAQTab(),
           _buildFeedbackTab(),
           _buildContactTab(),
+          _buildAboutUsTab(), // New tab content
         ],
       ),
     );
@@ -888,7 +892,6 @@ class _HelpAndFeedbackPageState extends State<HelpAndFeedbackPage>
         Center(
           child: Column(
             children: [
-              Icon(Icons.info_outline, size: 32, color: Colors.grey.shade400),
               const SizedBox(height: 8),
               Text(
                 'TARUMT Lost Item Tracker',
@@ -910,6 +913,287 @@ class _HelpAndFeedbackPageState extends State<HelpAndFeedbackPage>
           ),
         ),
       ],
+    );
+  }
+
+  // ==================== ABOUT US TAB (NEW!) ====================
+  Widget _buildAboutUsTab() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Text(
+          'About Us',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Learn more about TARUMT Lost Item Tracker',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 40),
+
+        // Rotating Logo Section
+        Center(
+          child: Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.indigo.shade100,
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(30),
+                child: Image.asset(
+                  'assets/logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 40),
+
+        // App Name
+        Center(
+          child: Text(
+            'TARUMT Lost Item Tracker',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.indigo.shade700,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+
+        const SizedBox(height: 32),
+
+        // Mission Section
+        _buildInfoCard(
+          icon: Icons.flag,
+          title: 'Our Mission',
+          content:
+          'To create a seamless and efficient platform that helps students, faculty, and staff reunite with their lost belongings quickly and easily. We believe that no item should be lost forever on campus.',
+          color: Colors.blue,
+        ),
+
+        const SizedBox(height: 16),
+
+        // Features Section
+        _buildInfoCard(
+          icon: Icons.star,
+          title: 'Key Features',
+          content:
+          '• Easy lost & found reporting\n'
+              '• Smart search with filters\n'
+              '• Real-time notifications\n'
+              '• Secure claim verification\n'
+              '• Interactive campus map\n'
+              '• Reward points system\n'
+              '• QR code identification',
+          color: Colors.orange,
+        ),
+
+        const SizedBox(height: 16),
+
+        // Technology Section
+        _buildInfoCard(
+          icon: Icons.code,
+          title: 'Built With',
+          content:
+          'This app is built using Flutter for cross-platform mobile development, powered by Firebase for real-time database, authentication, and cloud storage. We prioritize user privacy and data security.',
+          color: Colors.green,
+        ),
+
+        const SizedBox(height: 16),
+
+        // Community Section
+        _buildInfoCard(
+          icon: Icons.people,
+          title: 'Our Community',
+          content:
+          'Join thousands of TARUMT students and staff who are making our campus a better place. Together, we\'re building a community where lost items find their way home.',
+          color: Colors.purple,
+        ),
+
+        const SizedBox(height: 32),
+
+        // Developer Section
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.indigo.shade700,
+                Colors.indigo.shade500,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                Icons.school,
+                size: 48,
+                color: Colors.white,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Tunku Abdul Rahman University\nof Management and Technology',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Developed with ❤️ for the TARUMT community',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white70,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 32),
+
+        // Footer
+        Center(
+          child: Column(
+            children: [
+              Text(
+                'Version 1.0.0',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '© 2024 TARUMT. All rights reserved.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String title,
+    required String content,
+    required MaterialColor color,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 24, color: color.shade700),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              content,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+                height: 1.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String value,
+    required String label,
+    required MaterialColor color,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(icon, size: 32, color: color.shade700),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

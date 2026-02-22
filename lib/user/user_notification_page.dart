@@ -7,6 +7,11 @@ import 'found_item_report.dart';
 import 'user_home_page.dart';
 import 'search_and_filter_page.dart';
 import 'user_profile_page.dart';
+import 'qr_code_page.dart';
+import 'help_and_feedback_page.dart';
+import 'package:lost_item_tracker_client/role_selection_page.dart';
+import 'user_reward_page.dart';
+import 'user_analytical_report_page.dart';
 
 class UserNotificationPage extends StatefulWidget {
   const UserNotificationPage({super.key});
@@ -16,8 +21,73 @@ class UserNotificationPage extends StatefulWidget {
 }
 
 class _UserNotificationPageState extends State<UserNotificationPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final User? currentUser = FirebaseAuth.instance.currentUser;
   bool _isMarkingAllAsRead = false;
+  String? fullName;
+  String? campusId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    if (currentUser != null) {
+      try {
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser!.uid)
+            .get();
+
+        if (userDoc.exists) {
+          setState(() {
+            fullName = userDoc.get('fullName') ?? 'User';
+            campusId = userDoc.get('campusId') ?? 'N/A';
+          });
+        }
+      } catch (e) {
+        print('Error loading user data: $e');
+      }
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    Navigator.pop(context); // Close drawer first
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await FirebaseAuth.instance.signOut();
+
+              if (!mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const RoleSelectionPage(),
+                ),
+                    (route) => false,
+              );
+            },
+            child: Text(
+              'Logout',
+              style: TextStyle(color: Colors.red.shade700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _markAllAsRead() async {
     if (currentUser == null) return;
@@ -78,6 +148,7 @@ class _UserNotificationPageState extends State<UserNotificationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: const Text('Notifications'),
         backgroundColor: Colors.indigo.shade700,
@@ -116,6 +187,7 @@ class _UserNotificationPageState extends State<UserNotificationPage> {
             ),
         ],
       ),
+      endDrawer: _buildAccountDrawer(),
       body: currentUser == null
           ? const Center(
         child: Text('Please log in to view notifications'),
@@ -750,6 +822,205 @@ class _UserNotificationPageState extends State<UserNotificationPage> {
     );
   }
 
+  // ==================== ACCOUNT DRAWER ====================
+  Widget _buildAccountDrawer() {
+    return Drawer(
+      child: Container(
+        color: Colors.white,
+        child: Column(
+          children: [
+            // User Info Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.indigo.shade700,
+                    Colors.indigo.shade500,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.person,
+                      size: 50,
+                      color: Colors.indigo.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    fullName ?? 'Loading...',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    currentUser?.email ?? 'user@example.com',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'ID: ${campusId ?? 'N/A'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white60,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Menu Items
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _buildDrawerMenuItem(
+                    icon: Icons.person_outline,
+                    title: 'Profile',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Future.delayed(const Duration(milliseconds: 150));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UserProfilePage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerMenuItem(
+                    icon: Icons.qr_code,
+                    title: 'QR Code',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Future.delayed(const Duration(milliseconds: 150));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const QRCodePage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerMenuItem(
+                    icon: Icons.card_giftcard,
+                    title: 'Rewards',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Future.delayed(const Duration(milliseconds: 150));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UserRewardPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerMenuItem(
+                    icon: Icons.analytics_outlined,
+                    title: 'Analytics Report',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Future.delayed(const Duration(milliseconds: 150));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UserAnalyticalReportPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildDrawerMenuItem(
+                    icon: Icons.help_outline,
+                    title: 'Help & Feedback',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Future.delayed(const Duration(milliseconds: 150));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HelpAndFeedbackPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Logout Button
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _handleLogout,
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Logout'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: Colors.indigo.shade700,
+        size: 26,
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: Colors.grey.shade400,
+      ),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+    );
+  }
+
   // ==================== BOTTOM NAVIGATION ====================
   Widget _buildBottomAppBar(BuildContext context) {
     return BottomAppBar(
@@ -792,12 +1063,8 @@ class _UserNotificationPageState extends State<UserNotificationPage> {
         } else if (label == 'Notification') {
           // Already on notification page, do nothing
         } else if (label == 'Account') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const UserProfilePage(),
-            ),
-          );
+          // Open account drawer instead of navigating
+          _scaffoldKey.currentState?.openEndDrawer();
         }
       },
       child: Column(
