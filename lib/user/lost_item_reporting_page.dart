@@ -101,11 +101,13 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         _itemNameController.text = data['itemName'] as String? ?? '';
         _descriptionController.text = data['itemDescription'] as String? ?? '';
 
-        // Convert photoBytes from List<dynamic> to Uint8List
+        // Convert photoBytes from Firestore (Blob, List, or Uint8List) to Uint8List
         final photoBytesData = data['photoBytes'];
         if (photoBytesData != null) {
           if (photoBytesData is Uint8List) {
             _compressedImageBytes = photoBytesData;
+          } else if (photoBytesData is Blob) {
+            _compressedImageBytes = photoBytesData.bytes;
           } else if (photoBytesData is List) {
             _compressedImageBytes = Uint8List.fromList(List<int>.from(photoBytesData));
           }
@@ -608,14 +610,14 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         }
       }
 
-      // Step 5: Prepare data for Firestore
+      // Step 5: Prepare data for Firestore (use Blob for bytes; Firestore rejects raw Uint8List)
       final reportData = {
         'userId': user.uid,
         'category': _selectedCategory!,
         'itemName': _itemNameController.text.trim(),
         'itemDescription': _descriptionController.text.trim(),
-        'photoBytes': finalImageBytes, // Full size image (compressed)
-        'thumbnailBytes': thumbnailBytes, // Small thumbnail for lists
+        'photoBytes': finalImageBytes != null ? Blob(finalImageBytes!) : null,
+        'thumbnailBytes': thumbnailBytes != null ? Blob(thumbnailBytes!) : null,
         'latitude': _latitude!,
         'longitude': _longitude!,
         'locationRadius': _locationRadius ?? 50.0,
@@ -654,8 +656,8 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
           'category': _selectedCategory!,
           'itemName': _itemNameController.text.trim(),
           'itemDescription': _descriptionController.text.trim(),
-          'photoBytes': finalImageBytes,
-          'thumbnailBytes': thumbnailBytes,
+          'photoBytes': finalImageBytes != null ? Blob(finalImageBytes!) : null,
+          'thumbnailBytes': thumbnailBytes != null ? Blob(thumbnailBytes!) : null,
           'latitude': _latitude!,
           'longitude': _longitude!,
           'locationRadius': _locationRadius ?? 50.0,
@@ -800,8 +802,8 @@ class _LostItemReportingPageState extends State<LostItemReportingPage> {
         'category': _selectedCategory,
         'itemName': _itemNameController.text.trim(),
         'itemDescription': _descriptionController.text.trim(),
-        'photoBytes': finalImageBytes,
-        'thumbnailBytes': thumbnailBytes,
+        'photoBytes': finalImageBytes != null ? Blob(finalImageBytes!) : null,
+        'thumbnailBytes': thumbnailBytes != null ? Blob(thumbnailBytes!) : null,
         'latitude': _latitude,
         'longitude': _longitude,
         'locationRadius': _locationRadius,

@@ -318,6 +318,8 @@ class _FoundItemReportPageState extends State<FoundItemReportPage> {
     if (photoBytesData != null) {
       if (photoBytesData is Uint8List) {
         photoBytes = photoBytesData;
+      } else if (photoBytesData is Blob) {
+        photoBytes = photoBytesData.bytes;
       } else if (photoBytesData is List) {
         photoBytes = Uint8List.fromList(List<int>.from(photoBytesData));
       }

@@ -125,6 +125,7 @@ class _UserHomePageState extends State<UserHomePage> {
   Uint8List? _convertPhotoBytes(dynamic photoBytesData) {
     if (photoBytesData == null) return null;
     if (photoBytesData is Uint8List) return photoBytesData;
+    if (photoBytesData is Blob) return photoBytesData.bytes;
     if (photoBytesData is List) {
       return Uint8List.fromList(List<int>.from(photoBytesData));
     }

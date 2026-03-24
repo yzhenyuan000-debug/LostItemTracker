@@ -125,6 +125,8 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
         if (thumbnailBytesData != null) {
           if (thumbnailBytesData is Uint8List) {
             thumbnailBytes = thumbnailBytesData;
+          } else if (thumbnailBytesData is Blob) {
+            thumbnailBytes = thumbnailBytesData.bytes;
           } else if (thumbnailBytesData is List) {
             thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
           }
@@ -177,6 +179,8 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
         if (thumbnailBytesData != null) {
           if (thumbnailBytesData is Uint8List) {
             thumbnailBytes = thumbnailBytesData;
+          } else if (thumbnailBytesData is Blob) {
+            thumbnailBytes = thumbnailBytesData.bytes;
           } else if (thumbnailBytesData is List) {
             thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
           }
@@ -245,6 +249,8 @@ class _ReportHistoryPageState extends State<ReportHistoryPage> {
               if (thumbnailBytesData != null) {
                 if (thumbnailBytesData is Uint8List) {
                   thumbnailBytes = thumbnailBytesData;
+                } else if (thumbnailBytesData is Blob) {
+                  thumbnailBytes = thumbnailBytesData.bytes;
                 } else if (thumbnailBytesData is List) {
                   thumbnailBytes = Uint8List.fromList(List<int>.from(thumbnailBytesData));
                 }

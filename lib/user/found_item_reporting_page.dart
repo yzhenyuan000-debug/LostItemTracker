@@ -156,6 +156,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         if (photoBytesData != null) {
           if (photoBytesData is Uint8List) {
             _compressedImageBytes = photoBytesData;
+          } else if (photoBytesData is Blob) {
+            _compressedImageBytes = photoBytesData.bytes;
           } else if (photoBytesData is List) {
             _compressedImageBytes = Uint8List.fromList(List<int>.from(photoBytesData));
           }
@@ -675,8 +677,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         'category': _selectedCategory!,
         'itemName': _itemNameController.text.trim(),
         'itemDescription': _descriptionController.text.trim(),
-        'photoBytes': finalImageBytes,
-        'thumbnailBytes': thumbnailBytes,
+        'photoBytes': Blob(finalImageBytes),
+        'thumbnailBytes': thumbnailBytes != null ? Blob(thumbnailBytes!) : null,
         'latitude': _latitude!,
         'longitude': _longitude!,
         'locationRadius': _locationRadius ?? 50.0,
@@ -715,8 +717,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
           'category': _selectedCategory!,
           'itemName': _itemNameController.text.trim(),
           'itemDescription': _descriptionController.text.trim(),
-          'photoBytes': finalImageBytes,
-          'thumbnailBytes': thumbnailBytes,
+          'photoBytes': Blob(finalImageBytes),
+          'thumbnailBytes': thumbnailBytes != null ? Blob(thumbnailBytes!) : null,
           'latitude': _latitude!,
           'longitude': _longitude!,
           'locationRadius': _locationRadius ?? 50.0,
@@ -855,8 +857,8 @@ class _FoundItemReportingPageState extends State<FoundItemReportingPage> {
         'category': _selectedCategory,
         'itemName': _itemNameController.text.trim(),
         'itemDescription': _descriptionController.text.trim(),
-        'photoBytes': finalImageBytes,
-        'thumbnailBytes': thumbnailBytes,
+        'photoBytes': finalImageBytes != null ? Blob(finalImageBytes!) : null,
+        'thumbnailBytes': thumbnailBytes != null ? Blob(thumbnailBytes!) : null,
         'latitude': _latitude,
         'longitude': _longitude,
         'locationRadius': _locationRadius,
